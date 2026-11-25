@@ -20,12 +20,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,12 +33,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.termlinux.desktop.VncClient
 import com.termlinux.desktop.VncState
 import com.termlinux.desktop.X11KeyMap
+import com.termlinux.ui.components.TuiButton
+import com.termlinux.ui.components.TuiDivider
+import com.termlinux.ui.components.TuiText
+import com.termlinux.ui.theme.LocalTuiPalette
 
 private class VncSurfaceView(
     context: Context,
@@ -249,6 +248,7 @@ private class VncSurfaceView(
 fun DesktopScreen(
     onBackToTerminal: () -> Unit
 ) {
+    val p = LocalTuiPalette.current
     val context = LocalContext.current
     var frameTick by remember { mutableIntStateOf(0) }
     var currentBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -281,57 +281,29 @@ fun DesktopScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(p.panelAlt)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val title = when (val st = vncState) {
-                    is VncState.Connected -> "GUI ${st.width}×${st.height}"
-                    is VncState.Connecting -> "Connecting..."
-                    is VncState.Error -> "Disconnected"
-                    VncState.Disconnected -> "Offline"
-                }
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(
-                        onClick = { surfaceRef?.showKeyboard() },
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Keys")
-                    }
-                    OutlinedButton(
-                        onClick = { surfaceRef?.resetZoom() },
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("1:1")
-                    }
-                    OutlinedButton(
-                        onClick = { vncClient.connect("127.0.0.1", 5901) },
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Retry")
-                    }
-                    Button(
-                        onClick = onBackToTerminal,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Term")
-                    }
-                }
+            val title = when (val st = vncState) {
+                is VncState.Connected -> "X11 ${st.width}x${st.height}"
+                is VncState.Connecting -> "CONNECTING..."
+                is VncState.Error -> "DISCONNECTED"
+                VncState.Disconnected -> "OFFLINE"
+            }
+            TuiText(text = title, color = p.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TuiButton("KEYS", onClick = { surfaceRef?.showKeyboard() })
+                TuiButton("1:1", onClick = { surfaceRef?.resetZoom() })
+                TuiButton("RETRY", onClick = { vncClient.connect("127.0.0.1", 5901) })
+                TuiButton("TERM", onClick = onBackToTerminal, filled = true)
             }
         }
+        TuiDivider()
 
         Box(
             modifier = Modifier
@@ -367,16 +339,14 @@ fun DesktopScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
+                    TuiText(
                         text = if (st is VncState.Error) st.message else "Waiting for Linux GUI Desktop on 127.0.0.1:5901",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground
+                        fontSize = 12.sp
                     )
-                    Text(
+                    TuiText(
                         text = "In TermLinux terminal run:\n  tl-desktop setup\n  tl-desktop start",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.primary
+                        color = p.accent,
+                        fontSize = 12.sp
                     )
                 }
             }

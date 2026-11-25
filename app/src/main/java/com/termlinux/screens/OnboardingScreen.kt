@@ -1,6 +1,8 @@
 package com.termlinux.screens
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,30 +14,27 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.termlinux.distro.DistroEntry
 import com.termlinux.distro.InstallState
 import com.termlinux.storage.StorageAccessMode
 import com.termlinux.storage.StorageStatus
+import com.termlinux.ui.components.TuiButton
+import com.termlinux.ui.components.TuiDivider
+import com.termlinux.ui.components.TuiPanel
+import com.termlinux.ui.components.TuiProgressBar
+import com.termlinux.ui.components.TuiText
+import com.termlinux.ui.components.TuiTextInput
+import com.termlinux.ui.theme.LocalTuiPalette
 
 @Composable
 fun OnboardingScreen(
@@ -52,6 +51,7 @@ fun OnboardingScreen(
     onCancelInstall: () -> Unit,
     onOpenTerminal: () -> Unit
 ) {
+    val p = LocalTuiPalette.current
     val selectedDistro = distros.firstOrNull { it.id == selectedDistroId } ?: distros.first()
     var searchQuery by remember { mutableStateOf("") }
     val filteredDistros = remember(distros, searchQuery) {
@@ -67,237 +67,153 @@ fun OnboardingScreen(
         installState is InstallState.Extracting ||
         installState is InstallState.Configuring
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(p.bg)
+            .statusBarsPadding()
+            .navigationBarsPadding()
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(p.panelAlt)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            TuiText(text = "TERMLINUX :: SETUP", color = p.accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            TuiText(text = "ARM64 PROOT", color = p.textMuted, fontSize = 11.sp)
+        }
+        TuiDivider()
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "TermLinux",
-                style = MaterialTheme.typography.headlineMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = "Standalone ARM64 Linux environment via PRoot. No root, Termux, or SSH required.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            TuiText(
+                text = "Standalone ARM64 Linux userspace via PRoot. No root, Termux, or SSH required.",
+                color = p.textMuted,
+                fontSize = 12.sp
             )
 
-            // Step 1: Distro selection
-            Text(
-                text = "1. Choose Linux Distribution (${distros.size} available)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search distro or package manager (apt, pacman, dnf, apk)...") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            filteredDistros.forEach { distro ->
-                val selected = distro.id == selectedDistro.id
-                val installed = isDistroInstalled(distro.id)
-                val interrupted = hasInterruptedInstall(distro.id)
-                Card(
-                    onClick = { if (!isInstalling) onSelectDistro(distro.id) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(2.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (selected) MaterialTheme.colorScheme.surfaceVariant
-                        else MaterialTheme.colorScheme.surface
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+            TuiPanel("1. DISTRIBUTION (${distros.size})") {
+                TuiTextInput(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = "filter distro or pkg mgr (apt, pacman, dnf, apk)..."
+                )
+                filteredDistros.forEach { distro ->
+                    val selected = distro.id == selectedDistro.id
+                    val installed = isDistroInstalled(distro.id)
+                    val interrupted = hasInterruptedInstall(distro.id)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (selected) p.panelAlt else p.bg)
+                            .border(1.dp, if (selected) p.accent else p.border)
+                            .clickable { if (!isInstalling) onSelectDistro(distro.id) }
+                            .padding(10.dp)
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = distro.name,
-                                style = MaterialTheme.typography.titleSmall,
+                            TuiText(
+                                text = "${if (selected) ">" else " "} ${distro.name}",
+                                color = if (selected) p.accent else p.text,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             val badge = when {
-                                installed -> "Installed"
-                                interrupted -> "Incomplete"
+                                installed -> "[INSTALLED]"
+                                interrupted -> "[PARTIAL]"
                                 else -> "${distro.approxSizeBytes / (1024 * 1024)} MB"
                             }
-                            Text(
+                            TuiText(
                                 text = badge,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (installed) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (installed) p.accent else p.textMuted,
+                                fontSize = 11.sp
                             )
                         }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = distro.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Spacer(Modifier.height(3.dp))
+                        TuiText(text = distro.description, color = p.textMuted, fontSize = 11.sp)
                     }
                 }
             }
 
-            // Step 2: Storage access (/sdcard)
-            Text(
-                text = "2. Android Storage Access (/sdcard)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = storageStatus.summary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (storageStatus.mode == StorageAccessMode.DIRECT_SHARED_STORAGE) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                    Text(
-                        text = "Without All Files Access, Linux cannot freely read or modify /sdcard. " +
-                            "If you prefer scoped access, pick a single folder via SAF (exposed as a limited bridge, not full POSIX /sdcard). You can also skip this for now.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = onRequestAllFilesAccess,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("All Files Access")
-                        }
-                        OutlinedButton(
-                            onClick = onPickSafFolder,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Pick SAF Folder")
-                        }
-                    }
+            TuiPanel("2. ANDROID STORAGE (/SDCARD)") {
+                TuiText(
+                    text = storageStatus.summary,
+                    color = if (storageStatus.mode == StorageAccessMode.DIRECT_SHARED_STORAGE) p.accent else p.textMuted,
+                    fontSize = 11.sp
+                )
+                TuiText(
+                    text = "Without All Files Access, Linux cannot freely read/write /sdcard. SAF exposes only a selected folder via tlfiles.",
+                    color = p.textMuted,
+                    fontSize = 11.sp
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TuiButton("ALL FILES ACCESS", onClick = onRequestAllFilesAccess, modifier = Modifier.weight(1f))
+                    TuiButton("PICK SAF FOLDER", onClick = onPickSafFolder, modifier = Modifier.weight(1f))
                 }
             }
 
-            // Step 3: Install progress & action
             when (installState) {
                 is InstallState.Downloading -> {
                     val total = installState.progress.totalBytes
                     val read = installState.progress.bytesRead
                     val fraction = if (total > 0) (read.toFloat() / total.toFloat()).coerceIn(0f, 1f) else null
-                    Text(
+                    TuiText(
                         text = "Downloading ${installState.distro.name}: ${read / (1024 * 1024)} MB" +
                             if (total > 0) " / ${total / (1024 * 1024)} MB" else "",
-                        style = MaterialTheme.typography.bodySmall
+                        fontSize = 11.sp
                     )
-                    if (fraction != null) {
-                        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-                    } else {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    }
+                    TuiProgressBar(fraction = fraction)
                 }
 
                 is InstallState.Verifying -> {
-                    Text("Verifying SHA-256 checksum...", style = MaterialTheme.typography.bodySmall)
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    TuiText("Verifying SHA-256 checksum...", fontSize = 11.sp)
+                    TuiProgressBar(fraction = null)
                 }
 
                 is InstallState.Extracting -> {
-                    Text(
-                        "Extracting rootfs (${installState.entriesProcessed} entries)...",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    TuiText("Extracting rootfs (${installState.entriesProcessed} entries)...", fontSize = 11.sp)
+                    TuiProgressBar(fraction = null)
                 }
 
                 is InstallState.Configuring -> {
-                    Text("Configuring DNS, shell, and Storage Bridge...", style = MaterialTheme.typography.bodySmall)
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    TuiText("Configuring DNS, shell, and bridges...", fontSize = 11.sp)
+                    TuiProgressBar(fraction = null)
                 }
 
                 is InstallState.Failed -> {
-                    Text(
-                        text = "Error: ${installState.error}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    TuiText("ERR: ${installState.error}", color = p.error, fontSize = 11.sp)
                 }
 
                 is InstallState.Interrupted -> {
-                    Text(
-                        text = "Installation paused/interrupted. You can safely resume.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    TuiText("Install interrupted. Safe to resume.", color = p.info, fontSize = 11.sp)
                 }
 
                 else -> Unit
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (isInstalling) {
-                    OutlinedButton(
-                        onClick = onCancelInstall,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Cancel")
-                    }
+                    TuiButton("CANCEL", onClick = onCancelInstall, danger = true, modifier = Modifier.weight(1f))
                 } else if (isDistroInstalled(selectedDistro.id)) {
-                    Button(
-                        onClick = onOpenTerminal,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Open Terminal")
-                    }
+                    TuiButton("OPEN TERMINAL", onClick = onOpenTerminal, filled = true, modifier = Modifier.weight(1f))
                 } else {
                     val label = if (hasInterruptedInstall(selectedDistro.id)) {
-                        "Resume ${selectedDistro.name} Install"
+                        "RESUME ${selectedDistro.id.uppercase()}"
                     } else {
-                        "Install ${selectedDistro.name}"
+                        "INSTALL ${selectedDistro.id.uppercase()}"
                     }
-                    Button(
-                        onClick = { onInstallDistro(selectedDistro) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(label)
-                    }
+                    TuiButton(label, onClick = { onInstallDistro(selectedDistro) }, filled = true, modifier = Modifier.weight(1f))
                 }
             }
-
-            Text(
-                text = "Note: PRoot runs Linux userspace without root. Kernel-only features (systemd, Docker, kernel modules) are not supported.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

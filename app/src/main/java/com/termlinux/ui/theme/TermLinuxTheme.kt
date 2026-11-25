@@ -1,14 +1,10 @@
 package com.termlinux.ui.theme
 
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 
 data class TerminalColorTheme(
     val id: String,
@@ -19,7 +15,7 @@ data class TerminalColorTheme(
 )
 
 object TerminalThemes {
-    val Obsidian = TerminalColorTheme("obsidian", "Obsidian", 0xFF0C0E12.toInt(), 0xFFE6E9EF.toInt(), 0xFF4ADE80.toInt())
+    val Obsidian = TerminalColorTheme("obsidian", "TTY Dark", 0xFF07090C.toInt(), 0xFFE2E8F0.toInt(), 0xFF00E676.toInt())
     val Amoled = TerminalColorTheme("amoled", "AMOLED", 0xFF000000.toInt(), 0xFFF3F4F6.toInt(), 0xFF22D3EE.toInt())
     val NordicSlate = TerminalColorTheme("nordic", "Nord", 0xFF2E3440.toInt(), 0xFFD8DEE9.toInt(), 0xFF88C0D0.toInt())
     val GruvboxDark = TerminalColorTheme("gruvbox", "Gruvbox", 0xFF1D2021.toInt(), 0xFFEBDBB2.toInt(), 0xFFFABD2F.toInt())
@@ -47,11 +43,25 @@ object TerminalThemes {
         all.firstOrNull { it.id == id } ?: Obsidian
 }
 
+@Immutable
+data class TuiPalette(
+    val bg: Color,
+    val panel: Color,
+    val panelAlt: Color,
+    val border: Color,
+    val text: Color,
+    val textMuted: Color,
+    val accent: Color,
+    val accentText: Color,
+    val info: Color,
+    val error: Color
+)
+
 data class AppUiTheme(
     val id: String,
     val label: String,
     val isLight: Boolean,
-    val colorScheme: ColorScheme
+    val palette: TuiPalette
 )
 
 object AppUiThemes {
@@ -59,83 +69,71 @@ object AppUiThemes {
         id = "obsidian",
         label = "TTY Dark",
         isLight = false,
-        colorScheme = darkColorScheme(
-            primary = Color(0xFF00E676),
-            onPrimary = Color(0xFF001F0F),
-            secondary = Color(0xFF38BDF8),
-            onSecondary = Color(0xFF001E2E),
-            background = Color(0xFF07090C),
-            onBackground = Color(0xFFE2E8F0),
-            surface = Color(0xFF0D1117),
-            onSurface = Color(0xFFE2E8F0),
-            surfaceVariant = Color(0xFF161B22),
-            onSurfaceVariant = Color(0xFF8B949E),
-            outline = Color(0xFF28303D),
-            error = Color(0xFFFF5555),
-            onError = Color(0xFF2B0000)
+        palette = TuiPalette(
+            bg = Color(0xFF07090C),
+            panel = Color(0xFF0D1117),
+            panelAlt = Color(0xFF151B23),
+            border = Color(0xFF2B3442),
+            text = Color(0xFFE6EDF3),
+            textMuted = Color(0xFF8B949E),
+            accent = Color(0xFF00E676),
+            accentText = Color(0xFF04140A),
+            info = Color(0xFF38BDF8),
+            error = Color(0xFFFF5555)
         )
     )
 
     val Amoled = AppUiTheme(
         id = "amoled",
-        label = "AMOLED Black",
+        label = "AMOLED",
         isLight = false,
-        colorScheme = darkColorScheme(
-            primary = Color(0xFF22D3EE),
-            onPrimary = Color(0xFF042F2E),
-            secondary = Color(0xFF4ADE80),
-            onSecondary = Color(0xFF052E16),
-            background = Color(0xFF000000),
-            onBackground = Color(0xFFF3F4F6),
-            surface = Color(0xFF09090B),
-            onSurface = Color(0xFFF3F4F6),
-            surfaceVariant = Color(0xFF18181B),
-            onSurfaceVariant = Color(0xFFA1A1AA),
-            outline = Color(0xFF27272A),
-            error = Color(0xFFF87171),
-            onError = Color(0xFF450A0A)
+        palette = TuiPalette(
+            bg = Color(0xFF000000),
+            panel = Color(0xFF080A0D),
+            panelAlt = Color(0xFF12161C),
+            border = Color(0xFF262C36),
+            text = Color(0xFFF3F4F6),
+            textMuted = Color(0xFF9CA3AF),
+            accent = Color(0xFF22D3EE),
+            accentText = Color(0xFF02161A),
+            info = Color(0xFF4ADE80),
+            error = Color(0xFFFF5555)
         )
     )
 
     val Midnight = AppUiTheme(
         id = "midnight",
-        label = "Midnight Blue",
+        label = "Midnight",
         isLight = false,
-        colorScheme = darkColorScheme(
-            primary = Color(0xFF7AA2F7),
-            onPrimary = Color(0xFF0F172A),
-            secondary = Color(0xFF7DCFFF),
-            onSecondary = Color(0xFF0F172A),
-            background = Color(0xFF131520),
-            onBackground = Color(0xFFC0CAF5),
-            surface = Color(0xFF1A1D2D),
-            onSurface = Color(0xFFC0CAF5),
-            surfaceVariant = Color(0xFF24283B),
-            onSurfaceVariant = Color(0xFF9AA5CE),
-            outline = Color(0xFF343B58),
-            error = Color(0xFFF7768E),
-            onError = Color(0xFF450A0A)
+        palette = TuiPalette(
+            bg = Color(0xFF0B0E14),
+            panel = Color(0xFF111622),
+            panelAlt = Color(0xFF1A2233),
+            border = Color(0xFF2F3B54),
+            text = Color(0xFFC8D3F5),
+            textMuted = Color(0xFF828BB8),
+            accent = Color(0xFF7AA2F7),
+            accentText = Color(0xFF070B14),
+            info = Color(0xFF7DCFFF),
+            error = Color(0xFFF7768E)
         )
     )
 
     val Daylight = AppUiTheme(
         id = "light",
-        label = "Daylight",
+        label = "Paper",
         isLight = true,
-        colorScheme = lightColorScheme(
-            primary = Color(0xFF0F766E),
-            onPrimary = Color(0xFFFFFFFF),
-            secondary = Color(0xFF0369A1),
-            onSecondary = Color(0xFFFFFFFF),
-            background = Color(0xFFF8FAFC),
-            onBackground = Color(0xFF0F172A),
-            surface = Color(0xFFFFFFFF),
-            onSurface = Color(0xFF0F172A),
-            surfaceVariant = Color(0xFFE2E8F0),
-            onSurfaceVariant = Color(0xFF475569),
-            outline = Color(0xFFCBD5E1),
-            error = Color(0xFFDC2626),
-            onError = Color(0xFFFFFFFF)
+        palette = TuiPalette(
+            bg = Color(0xFFF3F4F6),
+            panel = Color(0xFFFFFFFF),
+            panelAlt = Color(0xFFE5E7EB),
+            border = Color(0xFF9CA3AF),
+            text = Color(0xFF111827),
+            textMuted = Color(0xFF4B5563),
+            accent = Color(0xFF0F766E),
+            accentText = Color(0xFFFFFFFF),
+            info = Color(0xFF0369A1),
+            error = Color(0xFFDC2626)
         )
     )
 
@@ -145,23 +143,15 @@ object AppUiThemes {
         all.firstOrNull { it.id == id } ?: Obsidian
 }
 
-private val LinuxSharpShapes = Shapes(
-    extraSmall = RoundedCornerShape(2.dp),
-    small = RoundedCornerShape(2.dp),
-    medium = RoundedCornerShape(3.dp),
-    large = RoundedCornerShape(3.dp),
-    extraLarge = RoundedCornerShape(4.dp)
-)
+val LocalTuiPalette = staticCompositionLocalOf { AppUiThemes.Obsidian.palette }
 
 @Composable
 fun TermLinuxTheme(
     appThemeId: String = "obsidian",
     content: @Composable () -> Unit
 ) {
-    val theme = AppUiThemes.byId(appThemeId)
-    MaterialTheme(
-        colorScheme = theme.colorScheme,
-        shapes = LinuxSharpShapes,
-        content = content
-    )
+    val palette = AppUiThemes.byId(appThemeId).palette
+    CompositionLocalProvider(LocalTuiPalette provides palette) {
+        content()
+    }
 }

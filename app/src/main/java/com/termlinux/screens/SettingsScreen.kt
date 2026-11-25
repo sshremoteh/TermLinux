@@ -1,7 +1,7 @@
 package com.termlinux.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,31 +10,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,20 +25,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.termlinux.distro.DistroEntry
 import com.termlinux.session.SessionState
 import com.termlinux.settings.AppSettings
 import com.termlinux.storage.SafEntry
 import com.termlinux.storage.StorageStatus
+import com.termlinux.ui.components.TuiButton
+import com.termlinux.ui.components.TuiDialog
+import com.termlinux.ui.components.TuiDivider
+import com.termlinux.ui.components.TuiPanel
+import com.termlinux.ui.components.TuiSlider
+import com.termlinux.ui.components.TuiText
+import com.termlinux.ui.components.TuiTextInput
+import com.termlinux.ui.components.TuiToggleRow
 import com.termlinux.ui.theme.AppUiThemes
+import com.termlinux.ui.theme.LocalTuiPalette
 import com.termlinux.ui.theme.TerminalThemes
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
@@ -94,6 +83,7 @@ fun SettingsScreen(
     onImportConfig: () -> Unit,
     safTestResult: String?
 ) {
+    val p = LocalTuiPalette.current
     var confirmReinstallDistro by remember { mutableStateOf<DistroEntry?>(null) }
     var distroSearch by remember { mutableStateOf("") }
 
@@ -110,409 +100,306 @@ fun SettingsScreen(
         onRefreshDiagnostics()
     }
 
-    Scaffold(
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            "TermLinux Settings",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    navigationIcon = {
-                        TextButton(onClick = onBackToTerminal) {
-                            Text("← Terminal")
-                        }
-                    }
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(p.bg)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    ) {
+        // Pure TUI top bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(p.panelAlt)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TuiButton(label = "<- TERMINAL", onClick = onBackToTerminal, filled = true)
+            TuiText(
+                text = "TERMLINUX :: CONFIG",
+                color = p.accent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
-    ) { padding ->
+        TuiDivider()
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .navigationBarsPadding()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Session section
-            SectionCard("Linux Session & Power") {
+            TuiPanel("SESSION & POWER") {
                 val statusText = when (sessionState) {
-                    is SessionState.Running -> "Running: ${sessionState.distroName} (PID ${sessionState.pid})"
-                    is SessionState.Paused -> "Paused in background: ${sessionState.distroName} (PID ${sessionState.pid})"
-                    is SessionState.Starting -> "Starting ${sessionState.distroName}..."
-                    is SessionState.Exited -> "Exited with code ${sessionState.exitCode}"
-                    is SessionState.ProcessLost -> "Lost: ${sessionState.reason}"
-                    is SessionState.Failed -> "Failed: ${sessionState.reason}"
-                    SessionState.Idle -> "Idle (no active session)"
+                    is SessionState.Running -> "RUNNING :: ${sessionState.distroName} (pid ${sessionState.pid})"
+                    is SessionState.Paused -> "PAUSED :: ${sessionState.distroName} (pid ${sessionState.pid})"
+                    is SessionState.Starting -> "STARTING :: ${sessionState.distroName}..."
+                    is SessionState.Exited -> "EXITED :: code ${sessionState.exitCode}"
+                    is SessionState.ProcessLost -> "LOST :: ${sessionState.reason}"
+                    is SessionState.Failed -> "FAILED :: ${sessionState.reason}"
+                    SessionState.Idle -> "IDLE :: no active session"
                 }
-                Text(statusText, style = MaterialTheme.typography.bodySmall)
+                TuiText(text = statusText, fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onRestartSession) { Text("Restart Session") }
-                    OutlinedButton(onClick = onStopSession) { Text("Stop") }
+                    TuiButton("RESTART", onClick = onRestartSession, filled = true)
+                    TuiButton("STOP", onClick = onStopSession, danger = true)
+                    TuiButton("GUI (VNC)", onClick = onOpenDesktop)
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("CPU WakeLock", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Keep CPU active when screen is off during long builds/upgrades",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(checked = settings.wakeLockEnabled, onCheckedChange = onWakeLockToggle)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Audio Bridge (127.0.0.1:14713)", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Stream Linux PulseAudio TCP PCM to Android speakers",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(checked = settings.audioBridgeEnabled, onCheckedChange = onAudioBridgeToggle)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onOpenDesktop, shape = RoundedCornerShape(8.dp)) {
-                        Text("Open GUI Desktop (VNC)")
-                    }
-                }
+                TuiToggleRow(
+                    label = "CPU WakeLock",
+                    subtitle = "Prevent CPU sleep during builds/upgrades",
+                    checked = settings.wakeLockEnabled,
+                    onToggle = onWakeLockToggle
+                )
+                TuiToggleRow(
+                    label = "Audio Bridge (127.0.0.1:14713)",
+                    subtitle = "Stream PulseAudio TCP PCM to Android AudioTrack",
+                    checked = settings.audioBridgeEnabled,
+                    onToggle = onAudioBridgeToggle
+                )
             }
 
-            // App & Terminal Themes
-            SectionCard("App & Environment Themes") {
-                Text("App UI Theme", style = MaterialTheme.typography.labelMedium)
+            TuiPanel("APP & TERMINAL THEMES") {
+                TuiText(text = "App UI Palette:", color = p.textMuted, fontSize = 11.sp)
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     AppUiThemes.all.forEach { t ->
-                        if (t.id == settings.appThemeId) {
-                            Button(onClick = { onAppThemeChange(t.id) }) { Text(t.label) }
-                        } else {
-                            OutlinedButton(onClick = { onAppThemeChange(t.id) }) { Text(t.label) }
-                        }
+                        TuiButton(
+                            label = t.label,
+                            onClick = { onAppThemeChange(t.id) },
+                            filled = (t.id == settings.appThemeId)
+                        )
                     }
                 }
 
-                Text("Terminal Color Scheme", style = MaterialTheme.typography.labelMedium)
+                TuiText(text = "Terminal Color Scheme:", color = p.textMuted, fontSize = 11.sp)
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     TerminalThemes.all.forEach { t ->
-                        val selected = t.id == settings.themeId
-                        if (selected) {
-                            Button(onClick = { onThemeChange(t.id) }) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(t.cursor))
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(t.label)
-                            }
-                        } else {
-                            OutlinedButton(onClick = { onThemeChange(t.id) }) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(t.background))
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(t.label)
-                            }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(Color(t.background))
+                                    .border(1.dp, Color(t.cursor))
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            TuiButton(
+                                label = t.label,
+                                onClick = { onThemeChange(t.id) },
+                                filled = (t.id == settings.themeId)
+                            )
                         }
                     }
                 }
             }
 
-            // Terminal appearance & input
-            SectionCard("Terminal & Input") {
-                Text("Terminal Font", style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val isNerd = settings.fontFamilyId == "nerd"
-                    if (isNerd) {
-                        Button(onClick = { onFontFamilyChange("nerd") }, shape = RoundedCornerShape(8.dp)) {
-                            Text("JetBrainsMono Nerd")
-                        }
-                        OutlinedButton(onClick = { onFontFamilyChange("monospace") }, shape = RoundedCornerShape(8.dp)) {
-                            Text("System Mono")
-                        }
-                    } else {
-                        OutlinedButton(onClick = { onFontFamilyChange("nerd") }, shape = RoundedCornerShape(8.dp)) {
-                            Text("JetBrainsMono Nerd")
-                        }
-                        Button(onClick = { onFontFamilyChange("monospace") }, shape = RoundedCornerShape(8.dp)) {
-                            Text("System Mono")
-                        }
-                    }
-                }
-
-                Text("Font Size: ${settings.fontSizeSp} sp (or pinch-to-zoom)", style = MaterialTheme.typography.bodySmall)
-                Slider(
-                    value = settings.fontSizeSp.toFloat(),
-                    onValueChange = { onFontSizeChange(it.toInt()) },
-                    valueRange = 8f..28f,
-                    steps = 19
-                )
-
-                Text("Scrollback: ${settings.scrollbackLines} lines", style = MaterialTheme.typography.bodySmall)
-                Slider(
-                    value = settings.scrollbackLines.toFloat(),
-                    onValueChange = { onScrollbackChange((it.toInt() / 1000) * 1000) },
-                    valueRange = 2000f..50000f,
-                    steps = 11
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Extra Keys Bar", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = settings.showExtraKeys, onCheckedChange = onExtraKeysToggle)
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val std = settings.extraKeysPreset == "standard"
-                    if (std) {
-                        Button(onClick = { onExtraKeysPresetChange("standard") }) { Text("Standard Keys") }
-                        OutlinedButton(onClick = { onExtraKeysPresetChange("dev") }) { Text("Dev Keys") }
-                    } else {
-                        OutlinedButton(onClick = { onExtraKeysPresetChange("standard") }) { Text("Standard Keys") }
-                        Button(onClick = { onExtraKeysPresetChange("dev") }) { Text("Dev Keys") }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Immersive Fullscreen", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = settings.immersiveMode, onCheckedChange = onImmersiveToggle)
-                }
-            }
-
-            // Optional tl-bootstrap presets
-            SectionCard("Bootstrap Presets (Optional)") {
-                Text(
-                    "Applied when you run 'tl-bootstrap' inside Linux (restart session after changing).",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Create non-root sudo user", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = settings.bootstrapCreateUser, onCheckedChange = onBootstrapCreateUserToggle)
-                }
-                if (settings.bootstrapCreateUser) {
-                    OutlinedTextField(
-                        value = settings.bootstrapUsername,
-                        onValueChange = onBootstrapUsernameChange,
-                        label = { Text("Username") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+            TuiPanel("TERMINAL & INPUT") {
+                TuiText(text = "Font Family:", color = p.textMuted, fontSize = 11.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TuiButton(
+                        label = "JetBrainsMono Nerd",
+                        onClick = { onFontFamilyChange("nerd") },
+                        filled = (settings.fontFamilyId == "nerd")
+                    )
+                    TuiButton(
+                        label = "System Mono",
+                        onClick = { onFontFamilyChange("monospace") },
+                        filled = (settings.fontFamilyId != "nerd")
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Zsh + Git Prompt preset", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = settings.bootstrapZshPreset, onCheckedChange = onBootstrapZshToggle)
+
+                TuiSlider(
+                    label = "Font Size (or pinch-to-zoom)",
+                    valueText = "${settings.fontSizeSp} sp",
+                    fraction = (settings.fontSizeSp - 8) / 20f,
+                    onFractionChange = { f -> onFontSizeChange((8 + f * 20).toInt()) }
+                )
+
+                TuiSlider(
+                    label = "Scrollback Lines",
+                    valueText = "${settings.scrollbackLines}",
+                    fraction = (settings.scrollbackLines - 2000) / 48000f,
+                    onFractionChange = { f ->
+                        val v = ((2000 + f * 48000).toInt() / 1000) * 1000
+                        onScrollbackChange(v.coerceIn(2000, 50000))
+                    }
+                )
+
+                TuiToggleRow(
+                    label = "Extra Keys Bar",
+                    checked = settings.showExtraKeys,
+                    onToggle = onExtraKeysToggle
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TuiButton(
+                        label = "PRESET: STANDARD",
+                        onClick = { onExtraKeysPresetChange("standard") },
+                        filled = (settings.extraKeysPreset == "standard")
+                    )
+                    TuiButton(
+                        label = "PRESET: DEV",
+                        onClick = { onExtraKeysPresetChange("dev") },
+                        filled = (settings.extraKeysPreset == "dev")
+                    )
                 }
+
+                TuiToggleRow(
+                    label = "Immersive Fullscreen",
+                    checked = settings.immersiveMode,
+                    onToggle = onImmersiveToggle
+                )
             }
 
-            // Distribution catalog
-            SectionCard("Distributions (${distros.size})") {
-                OutlinedTextField(
+            TuiPanel("TL-BOOTSTRAP PRESETS (OPTIONAL)") {
+                TuiText(
+                    text = "Applied when running 'tl-bootstrap' in Linux (restart session after change).",
+                    color = p.textMuted,
+                    fontSize = 11.sp
+                )
+                TuiToggleRow(
+                    label = "Create non-root sudo user",
+                    checked = settings.bootstrapCreateUser,
+                    onToggle = onBootstrapCreateUserToggle
+                )
+                if (settings.bootstrapCreateUser) {
+                    TuiTextInput(
+                        value = settings.bootstrapUsername,
+                        onValueChange = onBootstrapUsernameChange,
+                        placeholder = "username (default: linux)"
+                    )
+                }
+                TuiToggleRow(
+                    label = "Zsh + Git Prompt preset",
+                    checked = settings.bootstrapZshPreset,
+                    onToggle = onBootstrapZshToggle
+                )
+            }
+
+            TuiPanel("DISTRIBUTIONS (${distros.size})") {
+                TuiTextInput(
                     value = distroSearch,
                     onValueChange = { distroSearch = it },
-                    placeholder = { Text("Filter distros (Debian, Arch, Kali, Alpine...)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    placeholder = "filter distros (debian, arch, kali, alpine)..."
                 )
                 filteredDistros.forEach { distro ->
                     val installed = isDistroInstalled(distro.id)
                     val selected = distro.id == settings.selectedDistroId
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(p.bg)
+                            .border(1.dp, if (selected) p.accent else p.border)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "${distro.name}${if (selected) " (Active)" else ""}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                        Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
+                            TuiText(
+                                text = "${distro.name}${if (selected) " *" else ""}",
+                                fontSize = 12.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1
                             )
-                            Text(
-                                text = "${if (installed) "Installed" else "${distro.approxSizeBytes / (1024 * 1024)} MB"} • ${distro.packageManager}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            TuiText(
+                                text = "${if (installed) "installed" else "${distro.approxSizeBytes / (1024 * 1024)} MB"} :: ${distro.packageManager}",
+                                color = p.textMuted,
+                                fontSize = 10.sp
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (installed) {
-                                TextButton(onClick = { onSelectDistro(distro.id) }) { Text("Launch") }
+                                TuiButton("LAUNCH", onClick = { onSelectDistro(distro.id) }, filled = true)
                             }
-                            OutlinedButton(onClick = {
-                                if (installed) confirmReinstallDistro = distro else onReinstallDistro(distro)
-                            }) {
-                                Text(if (installed) "Reinstall" else "Install")
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Storage (/sdcard) section
-            SectionCard("Storage Access (/sdcard)") {
-                Text(storageStatus.summary, style = MaterialTheme.typography.bodySmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = onRequestAllFilesAccess,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("All Files Access")
-                    }
-                    OutlinedButton(
-                        onClick = onPickSafFolder,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Pick SAF Folder")
-                    }
-                }
-                if (storageStatus.safPermissionValid) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onRunSafTest) {
-                            Text("Test SAF Read/Write")
-                        }
-                    }
-                    if (!safTestResult.isNullOrBlank()) {
-                        Text(safTestResult, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                    if (safEntries.isNotEmpty()) {
-                        Text(
-                            "SAF Folder Preview (${safEntries.size} items):",
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                        safEntries.take(8).forEach { item ->
-                            Text(
-                                text = "${if (item.isDirectory) "[DIR]" else "[FILE]"} ${item.name}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace
+                            TuiButton(
+                                label = if (installed) "REINSTALL" else "INSTALL",
+                                onClick = {
+                                    if (installed) confirmReinstallDistro = distro else onReinstallDistro(distro)
+                                }
                             )
                         }
                     }
                 }
             }
 
-            // Config export/import & diagnostics
-            SectionCard("Diagnostics & Config") {
+            TuiPanel("STORAGE ACCESS (/SDCARD)") {
+                TuiText(text = storageStatus.summary, fontSize = 11.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onRefreshDiagnostics) { Text("Refresh") }
-                    OutlinedButton(onClick = onExportLogs) { Text("Export Logs") }
+                    TuiButton("ALL FILES ACCESS", onClick = onRequestAllFilesAccess, modifier = Modifier.weight(1f))
+                    TuiButton("PICK SAF FOLDER", onClick = onPickSafFolder, modifier = Modifier.weight(1f))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onExportConfig) { Text("Export Config (SAF)") }
-                    OutlinedButton(onClick = onImportConfig) { Text("Import Config (SAF)") }
+                if (storageStatus.safPermissionValid) {
+                    TuiButton("TEST SAF READ/WRITE", onClick = onRunSafTest)
+                    if (!safTestResult.isNullOrBlank()) {
+                        TuiText(text = safTestResult, color = p.accent, fontSize = 11.sp)
+                    }
+                    safEntries.take(8).forEach { item ->
+                        TuiText(
+                            text = "${if (item.isDirectory) "[DIR] " else "[FILE]"} ${item.name}",
+                            color = p.textMuted,
+                            fontSize = 10.sp
+                        )
+                    }
                 }
-                Text(
-                    text = diagnosticsText,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace
-                )
             }
 
-            // Limitations & Licenses
-            SectionCard("Android/PRoot Limitations & Licenses") {
-                Text(
-                    text = "- PRoot emulates chroot/bind-mount in userspace via ptrace; systemd, Docker, raw sockets, and kernel modules are not available.\n" +
-                        "- Android 10–16 scoped storage restricts /sdcard unless All Files Access (MANAGE_EXTERNAL_STORAGE) is granted.\n" +
-                        "- SAF folder access uses ContentResolver and cannot be POSIX bind-mounted.\n" +
-                        "- Components: termux/proot (GPL-2.0-or-later), termux/terminal-emulator & terminal-view (Apache-2.0), libtalloc (LGPL-3.0-or-later).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            TuiPanel("DIAGNOSTICS & CONFIG") {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TuiButton("REFRESH", onClick = onRefreshDiagnostics)
+                    TuiButton("EXPORT LOGS", onClick = onExportLogs)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TuiButton("EXPORT CFG", onClick = onExportConfig)
+                    TuiButton("IMPORT CFG", onClick = onImportConfig)
+                }
+                TuiText(text = diagnosticsText, color = p.textMuted, fontSize = 10.sp)
+            }
+
+            TuiPanel("LIMITATIONS & LICENSES") {
+                TuiText(
+                    text = "- PRoot runs in userspace via ptrace; systemd, Docker, raw sockets, and kernel modules are unsupported.\n" +
+                        "- Scoped storage restricts /sdcard unless MANAGE_EXTERNAL_STORAGE is granted.\n" +
+                        "- Licenses: termux/proot (GPL-2.0+), terminal-emulator/view (Apache-2.0), libtalloc (LGPL-3.0+).",
+                    color = p.textMuted,
+                    fontSize = 11.sp
                 )
             }
         }
     }
 
     confirmReinstallDistro?.let { distro ->
-        AlertDialog(
-            onDismissRequest = { confirmReinstallDistro = null },
-            title = { Text("Reinstall ${distro.name}?") },
-            text = {
-                Text("This will re-download and extract ${distro.name} while preserving /root and /home. Active sessions should be stopped first.")
-            },
-            confirmButton = {
-                Button(onClick = {
-                    val target = distro
-                    confirmReinstallDistro = null
-                    onReinstallDistro(target)
-                }) {
-                    Text("Reinstall")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmReinstallDistro = null }) {
-                    Text("Cancel")
+        TuiDialog(
+            title = "REINSTALL ${distro.name.uppercase()}?",
+            onDismiss = { confirmReinstallDistro = null },
+            footer = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TuiButton("CANCEL", onClick = { confirmReinstallDistro = null })
+                    TuiButton(
+                        label = "REINSTALL",
+                        filled = true,
+                        danger = true,
+                        onClick = {
+                            val target = distro
+                            confirmReinstallDistro = null
+                            onReinstallDistro(target)
+                        }
+                    )
                 }
             }
-        )
-    }
-}
-
-@Composable
-private fun SectionCard(
-    title: String,
-    content: @Composable () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = "[ ${title.uppercase()} ]",
-                style = MaterialTheme.typography.labelMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+            TuiText(
+                text = "Re-downloads and extracts ${distro.name} while preserving /root and /home.",
+                fontSize = 12.sp
             )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            content()
         }
     }
 }

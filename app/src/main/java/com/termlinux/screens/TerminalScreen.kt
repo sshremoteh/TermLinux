@@ -3,14 +3,18 @@ package com.termlinux.screens
 import android.content.Intent
 import android.net.Uri
 import android.view.KeyEvent
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -20,41 +24,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -65,8 +50,13 @@ import com.termlinux.session.SessionManager
 import com.termlinux.session.SessionState
 import com.termlinux.settings.AppSettings
 import com.termlinux.terminal.TerminalHostView
+import com.termlinux.ui.components.TuiButton
+import com.termlinux.ui.components.TuiDialog
+import com.termlinux.ui.components.TuiDivider
+import com.termlinux.ui.components.TuiText
+import com.termlinux.ui.components.TuiTextInput
+import com.termlinux.ui.theme.LocalTuiPalette
 import com.termlinux.ui.theme.TerminalThemes
-import kotlinx.coroutines.launch
 
 @Composable
 fun TerminalScreen(
@@ -89,8 +79,8 @@ fun TerminalScreen(
     onToggleWakeLock: (Boolean) -> Unit,
     onFontSizeScaled: (Int) -> Unit
 ) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+    val p = LocalTuiPalette.current
+    var drawerOpen by remember { mutableStateOf(false) }
     var showDistroPicker by remember { mutableStateOf(false) }
     var showSearchDialog by remember { mutableStateOf(false) }
     var showUrlsDialog by remember { mutableStateOf(false) }
@@ -121,153 +111,167 @@ fun TerminalScreen(
         hostViewRef?.setModifiers(ctrlActive, altActive)
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = true,
-        drawerContent = {
-            TermuxDrawerSheet(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(theme.background))
+            .imePadding()
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            when (sessionState) {
+                is SessionState.ProcessLost -> {
+                    SessionStatusBanner(
+                        message = sessionState.reason,
+                        actionLabel = "RESTART",
+                        onAction = onRestartSession,
+                        onSettings = onOpenSettings
+                    )
+                }
+
+                is SessionState.Exited -> {
+                    SessionStatusBanner(
+                        message = "[process exited: ${sessionState.exitCode}]",
+                        actionLabel = "RESTART",
+                        onAction = onRestartSession,
+                        onSettings = onOpenSettings
+                    )
+                }
+
+                is SessionState.Failed -> {
+                    SessionStatusBanner(
+                        message = "ERR: ${sessionState.reason}",
+                        actionLabel = "RETRY",
+                        onAction = onRestartSession,
+                        onSettings = onOpenSettings
+                    )
+                }
+
+                else -> Unit
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        TerminalHostView(
+                            context = ctx,
+                            onThreeFingerTripleTap = { drawerOpen = !drawerOpen },
+                            onFontSizeScaled = onFontSizeScaled,
+                            onModifierConsumed = {
+                                ctrlActive = false
+                                altActive = false
+                            }
+                        ).also { host ->
+                            hostViewRef = host
+                            host.applyAppearance(settings.fontSizeSp, theme, settings.fontFamilyId)
+                            sessionManager.attachUiClient(host.sessionClient)
+                            host.attachSession(activeSession)
+                        }
+                    },
+                    update = { host ->
+                        hostViewRef = host
+                        host.applyAppearance(settings.fontSizeSp, theme, settings.fontFamilyId)
+                        host.attachSession(activeSession)
+                    }
+                )
+            }
+
+            if (settings.showExtraKeys) {
+                TuiExtraKeysGrid(
+                    ctrlActive = ctrlActive,
+                    altActive = altActive,
+                    preset = settings.extraKeysPreset,
+                    onOpenMenu = { drawerOpen = true },
+                    onToggleCtrl = { ctrlActive = !ctrlActive },
+                    onToggleAlt = { altActive = !altActive },
+                    onKeyCode = { code ->
+                        hostViewRef?.sendSpecialKey(code)
+                        if (ctrlActive) ctrlActive = false
+                        if (altActive) altActive = false
+                    },
+                    onText = { text ->
+                        hostViewRef?.sendText(text)
+                        if (ctrlActive) ctrlActive = false
+                        if (altActive) altActive = false
+                    }
+                )
+            }
+        }
+
+        // Scrim when TUI drawer is open
+        AnimatedVisibility(
+            visible = drawerOpen,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { drawerOpen = false }
+            )
+        }
+
+        // Sharp TUI Drawer (0dp edges, 1dp border)
+        AnimatedVisibility(
+            visible = drawerOpen,
+            enter = slideInHorizontally { -it },
+            exit = slideOutHorizontally { -it }
+        ) {
+            TuiDrawerPanel(
                 sessions = sessions,
                 activeSessionId = activeSessionId,
                 wakeLockEnabled = settings.wakeLockEnabled,
                 onSelectSession = { id ->
                     onSwitchSession(id)
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                 },
                 onCloseSession = onCloseSession,
                 onNewSession = {
                     onNewSession()
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                 },
                 onOpenDistroPicker = {
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                     showDistroPicker = true
                 },
                 onToggleKeyboard = {
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                     hostViewRef?.toggleSoftKeyboard()
                 },
                 onPaste = {
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                     hostViewRef?.pasteFromClipboard()
                 },
                 onOpenSearch = {
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                     showSearchDialog = true
                 },
                 onOpenUrls = {
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                     showUrlsDialog = true
                 },
                 onToggleWakeLock = { onToggleWakeLock(!settings.wakeLockEnabled) },
                 onRestartSession = {
                     onRestartSession()
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                 },
                 onOpenSettings = {
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                     onOpenSettings()
                 },
                 onOpenDesktop = {
-                    scope.launch { drawerState.close() }
+                    drawerOpen = false
                     onOpenDesktop()
                 }
             )
-        }
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(theme.background))
-                .imePadding()
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                when (sessionState) {
-                    is SessionState.ProcessLost -> {
-                        SessionStatusBanner(
-                            message = sessionState.reason,
-                            actionLabel = "Restart",
-                            onAction = onRestartSession,
-                            onSettings = onOpenSettings
-                        )
-                    }
-
-                    is SessionState.Exited -> {
-                        SessionStatusBanner(
-                            message = "[Process completed (code ${sessionState.exitCode})]",
-                            actionLabel = "Restart",
-                            onAction = onRestartSession,
-                            onSettings = onOpenSettings
-                        )
-                    }
-
-                    is SessionState.Failed -> {
-                        SessionStatusBanner(
-                            message = "Failed: ${sessionState.reason}",
-                            actionLabel = "Retry",
-                            onAction = onRestartSession,
-                            onSettings = onOpenSettings
-                        )
-                    }
-
-                    else -> Unit
-                }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) {
-                    AndroidView(
-                        modifier = Modifier.fillMaxSize(),
-                        factory = { ctx ->
-                            TerminalHostView(
-                                context = ctx,
-                                onThreeFingerTripleTap = {
-                                    scope.launch {
-                                        if (drawerState.isClosed) drawerState.open() else drawerState.close()
-                                    }
-                                },
-                                onFontSizeScaled = onFontSizeScaled,
-                                onModifierConsumed = {
-                                    ctrlActive = false
-                                    altActive = false
-                                }
-                            ).also { host ->
-                                hostViewRef = host
-                                host.applyAppearance(settings.fontSizeSp, theme, settings.fontFamilyId)
-                                sessionManager.attachUiClient(host.sessionClient)
-                                host.attachSession(activeSession)
-                            }
-                        },
-                        update = { host ->
-                            hostViewRef = host
-                            host.applyAppearance(settings.fontSizeSp, theme, settings.fontFamilyId)
-                            host.attachSession(activeSession)
-                        }
-                    )
-                }
-
-                if (settings.showExtraKeys) {
-                    TermuxExtraKeysGrid(
-                        ctrlActive = ctrlActive,
-                        altActive = altActive,
-                        preset = settings.extraKeysPreset,
-                        onOpenMenu = { scope.launch { drawerState.open() } },
-                        onToggleCtrl = { ctrlActive = !ctrlActive },
-                        onToggleAlt = { altActive = !altActive },
-                        onKeyCode = { code ->
-                            hostViewRef?.sendSpecialKey(code)
-                            if (ctrlActive) ctrlActive = false
-                            if (altActive) altActive = false
-                        },
-                        onText = { text ->
-                            hostViewRef?.sendText(text)
-                            if (ctrlActive) ctrlActive = false
-                            if (altActive) altActive = false
-                        }
-                    )
-                }
-            }
         }
     }
 
@@ -290,81 +294,65 @@ fun TerminalScreen(
     if (showSearchDialog) {
         var query by remember { mutableStateOf("") }
         val matches = remember(query) { hostViewRef?.searchTranscript(query).orEmpty() }
-        AlertDialog(
-            onDismissRequest = { showSearchDialog = false },
-            title = { Text("Search Terminal History", style = MaterialTheme.typography.titleMedium) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        placeholder = { Text("Type text to search...") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    LazyColumn(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        items(matches) { line ->
-                            Text(
-                                text = line,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
+        TuiDialog(
+            title = "SEARCH SCROLLBACK",
+            onDismiss = { showSearchDialog = false }
+        ) {
+            TuiTextInput(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = "grep pattern..."
+            )
+            LazyColumn(
+                modifier = Modifier.height(220.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(matches) { line ->
+                    TuiText(text = line, fontSize = 11.sp)
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showSearchDialog = false }) { Text("Close") }
             }
-        )
+        }
     }
 
     if (showUrlsDialog) {
         val urls = remember { hostViewRef?.extractUrls().orEmpty() }
-        val ctx = androidx.compose.ui.platform.LocalContext.current
-        AlertDialog(
-            onDismissRequest = { showUrlsDialog = false },
-            title = { Text("Detected URLs", style = MaterialTheme.typography.titleMedium) },
-            text = {
-                if (urls.isEmpty()) {
-                    Text("No URLs found in terminal buffer.", style = MaterialTheme.typography.bodySmall)
-                } else {
-                    LazyColumn(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(urls) { url ->
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        runCatching {
-                                            ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                        }
-                                        showUrlsDialog = false
+        val ctx = LocalContext.current
+        TuiDialog(
+            title = "DETECTED URLS",
+            onDismiss = { showUrlsDialog = false }
+        ) {
+            if (urls.isEmpty()) {
+                TuiText(text = "No URLs found in buffer.", color = p.textMuted, fontSize = 12.sp)
+            } else {
+                LazyColumn(
+                    modifier = Modifier.height(220.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(urls) { url ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(p.bg)
+                                .border(1.dp, p.border)
+                                .clickable {
+                                    runCatching {
+                                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                     }
-                            ) {
-                                Text(
-                                    text = url,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(10.dp)
-                                )
-                            }
+                                    showUrlsDialog = false
+                                }
+                                .padding(8.dp)
+                        ) {
+                            TuiText(text = url, color = p.accent, fontSize = 11.sp)
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showUrlsDialog = false }) { Text("Close") }
             }
-        )
+        }
     }
 }
 
 @Composable
-private fun TermuxDrawerSheet(
+private fun TuiDrawerPanel(
     sessions: List<ManagedSessionInfo>,
     activeSessionId: String?,
     wakeLockEnabled: Boolean,
@@ -381,208 +369,118 @@ private fun TermuxDrawerSheet(
     onOpenSettings: () -> Unit,
     onOpenDesktop: () -> Unit
 ) {
-    ModalDrawerSheet(
-        modifier = Modifier.width(300.dp),
-        drawerContainerColor = MaterialTheme.colorScheme.surface
+    val p = LocalTuiPalette.current
+    Column(
+        modifier = Modifier
+            .width(300.dp)
+            .fillMaxHeight()
+            .background(p.panel)
+            .border(1.dp, p.border)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(12.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(16.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "TermLinux",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "${sessions.size} session(s) • 3-finger 3x tap",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Button(
-                    onClick = onOpenSettings,
-                    shape = RoundedCornerShape(2.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp)
-                ) {
-                    Text("CONFIG", style = MaterialTheme.typography.labelMedium, fontFamily = FontFamily.Monospace, maxLines = 1)
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text = "[ SESSIONS ]",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(8.dp))
-
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(sessions, key = { it.id }) { info ->
-                    val isActive = info.id == activeSessionId
-                    Surface(
-                        color = if (isActive) MaterialTheme.colorScheme.surfaceVariant
-                        else MaterialTheme.colorScheme.background,
-                        shape = RoundedCornerShape(2.dp),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelectSession(info.id) }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (info.isRunning) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.error
-                                        )
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = info.title,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = if (info.isRunning && info.pid > 0) {
-                                            "${info.distroName} • PID ${info.pid}"
-                                        } else {
-                                            "${info.distroName} • exited"
-                                        },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "×",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable { onCloseSession(info.id) }
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Spacer(Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DrawerActionButton("+ Tab", onClick = onNewSession, filled = true, modifier = Modifier.weight(1f))
-                DrawerActionButton("Distros", onClick = onOpenDistroPicker, filled = true, modifier = Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DrawerActionButton("Keyboard", onClick = onToggleKeyboard, modifier = Modifier.weight(1f))
-                DrawerActionButton("Paste", onClick = onPaste, modifier = Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DrawerActionButton("Find", onClick = onOpenSearch, modifier = Modifier.weight(1f))
-                DrawerActionButton("URLs", onClick = onOpenUrls, modifier = Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DrawerActionButton(
-                    label = if (wakeLockEnabled) "WakeLock: ON" else "WakeLock: OFF",
-                    onClick = onToggleWakeLock,
-                    filled = wakeLockEnabled,
-                    modifier = Modifier.weight(1f)
+            Column(modifier = Modifier.weight(1f)) {
+                TuiText(text = "TERMLINUX", color = p.accent, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                TuiText(
+                    text = "${sessions.size} tty • 3-finger 3x tap",
+                    color = p.textMuted,
+                    fontSize = 10.sp,
+                    maxLines = 1
                 )
-                DrawerActionButton("Desktop (GUI)", onClick = onOpenDesktop, modifier = Modifier.weight(1f))
             }
-            Spacer(Modifier.height(8.dp))
-            DrawerActionButton("Restart Session", onClick = onRestartSession, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.width(8.dp))
+            TuiButton(label = "CONFIG", onClick = onOpenSettings, filled = true)
         }
-    }
-}
 
-@Composable
-private fun DrawerActionButton(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    filled: Boolean = false
-) {
-    val shape = RoundedCornerShape(2.dp)
-    if (filled) {
-        Button(
-            onClick = onClick,
-            shape = shape,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-            modifier = modifier.height(36.dp)
+        Spacer(Modifier.height(10.dp))
+        TuiDivider()
+        Spacer(Modifier.height(8.dp))
+
+        TuiText(text = "[ SESSIONS ]", color = p.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(label, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            items(sessions, key = { it.id }) { info ->
+                val isActive = info.id == activeSessionId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (isActive) p.panelAlt else p.bg)
+                        .border(1.dp, if (isActive) p.accent else p.border)
+                        .clickable { onSelectSession(info.id) }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        TuiText(
+                            text = "${if (info.isRunning) "*" else "!"} ${info.title}",
+                            color = if (isActive) p.accent else p.text,
+                            fontSize = 12.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1
+                        )
+                        TuiText(
+                            text = if (info.isRunning && info.pid > 0) {
+                                "${info.distroName} :: pid ${info.pid}"
+                            } else {
+                                "${info.distroName} :: exited"
+                            },
+                            color = p.textMuted,
+                            fontSize = 10.sp,
+                            maxLines = 1
+                        )
+                    }
+                    TuiText(
+                        text = "[X]",
+                        color = p.textMuted,
+                        fontSize = 11.sp,
+                        modifier = Modifier
+                            .clickable { onCloseSession(info.id) }
+                            .padding(start = 8.dp)
+                    )
+                }
+            }
         }
-    } else {
-        OutlinedButton(
-            onClick = onClick,
-            shape = shape,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-            modifier = modifier.height(36.dp)
-        ) {
-            Text(label, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+        TuiDivider()
+        Spacer(Modifier.height(8.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TuiButton("+ TAB", onClick = onNewSession, filled = true, modifier = Modifier.weight(1f))
+            TuiButton("DISTROS", onClick = onOpenDistroPicker, filled = true, modifier = Modifier.weight(1f))
         }
+        Spacer(Modifier.height(6.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TuiButton("KEYS", onClick = onToggleKeyboard, modifier = Modifier.weight(1f))
+            TuiButton("PASTE", onClick = onPaste, modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TuiButton("FIND", onClick = onOpenSearch, modifier = Modifier.weight(1f))
+            TuiButton("URLS", onClick = onOpenUrls, modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TuiButton(
+                label = if (wakeLockEnabled) "WAKELOCK:ON" else "WAKELOCK:OFF",
+                onClick = onToggleWakeLock,
+                filled = wakeLockEnabled,
+                modifier = Modifier.weight(1f)
+            )
+            TuiButton("GUI (VNC)", onClick = onOpenDesktop, modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(6.dp))
+        TuiButton("RESTART SESSION", onClick = onRestartSession, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -593,36 +491,32 @@ private fun SessionStatusBanner(
     onAction: () -> Unit,
     onSettings: () -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
+    val p = LocalTuiPalette.current
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(p.panelAlt)
+            .border(1.dp, p.error)
             .statusBarsPadding()
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.labelMedium,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.weight(1f)
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TextButton(onClick = onSettings) { Text("Settings") }
-                Button(onClick = onAction, shape = RoundedCornerShape(8.dp)) { Text(actionLabel) }
-            }
+        TuiText(
+            text = message,
+            color = p.error,
+            fontSize = 11.sp,
+            modifier = Modifier.weight(1f).padding(end = 8.dp)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TuiButton("CONFIG", onClick = onSettings)
+            TuiButton(actionLabel, onClick = onAction, filled = true)
         }
     }
 }
 
 @Composable
-private fun TermuxExtraKeysGrid(
+private fun TuiExtraKeysGrid(
     ctrlActive: Boolean,
     altActive: Boolean,
     preset: String,
@@ -632,6 +526,7 @@ private fun TermuxExtraKeysGrid(
     onKeyCode: (Int) -> Unit,
     onText: (String) -> Unit
 ) {
+    val p = LocalTuiPalette.current
     val row1 = listOf("ESC", "/", "-", "HOME", "↑", "END", "PGUP", "☰")
     val row2 = if (preset == "dev") {
         listOf("TAB", "CTRL", "ALT", "←", "↓", "→", "|", "~")
@@ -642,10 +537,10 @@ private fun TermuxExtraKeysGrid(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
+            .background(p.bg)
             .navigationBarsPadding()
-            .padding(horizontal = 3.dp, vertical = 3.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         ExtraKeyRow(row1, ctrlActive, altActive, onOpenMenu, onToggleCtrl, onToggleAlt, onKeyCode, onText)
         ExtraKeyRow(row2, ctrlActive, altActive, onOpenMenu, onToggleCtrl, onToggleAlt, onKeyCode, onText)
@@ -663,27 +558,23 @@ private fun ExtraKeyRow(
     onKeyCode: (Int) -> Unit,
     onText: (String) -> Unit
 ) {
+    val p = LocalTuiPalette.current
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         labels.forEach { label ->
             val isActive = (label == "CTRL" && ctrlActive) || (label == "ALT" && altActive)
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(34.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(
-                        if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                        else MaterialTheme.colorScheme.surface
-                    )
-                    .border(
-                        1.dp,
-                        if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        RoundedCornerShape(2.dp)
-                    )
-                    .clickable {
+                    .height(32.dp)
+                    .background(if (isActive) p.accent else p.panel)
+                    .border(1.dp, if (isActive) p.accent else p.border)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
                         when (label) {
                             "☰" -> onOpenMenu()
                             "ESC" -> onKeyCode(KeyEvent.KEYCODE_ESCAPE)
@@ -703,12 +594,11 @@ private fun ExtraKeyRow(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
+                TuiText(
                     text = label,
+                    color = if (isActive) p.accentText else p.text,
                     fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
                     fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
             }
@@ -724,6 +614,7 @@ private fun DistroSessionPickerDialog(
     onLaunchDistro: (DistroEntry) -> Unit,
     onInstallDistro: (DistroEntry) -> Unit
 ) {
+    val p = LocalTuiPalette.current
     var query by remember { mutableStateOf("") }
     val sorted = remember(distros, query) {
         distros.filter {
@@ -734,83 +625,50 @@ private fun DistroSessionPickerDialog(
         }.sortedByDescending { isDistroInstalled(it.id) }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                "Launch Distro Session",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text("Search distro or pkg manager...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                LazyColumn(
-                    modifier = Modifier.height(320.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(sorted, key = { it.id }) { distro ->
-                        val installed = isDistroInstalled(distro.id)
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(
-                                1.dp,
-                                if (installed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                            ),
-                            color = MaterialTheme.colorScheme.background,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (installed) onLaunchDistro(distro) else onInstallDistro(distro)
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = distro.name,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = if (installed) {
-                                            "Installed • ${distro.packageManager}"
-                                        } else {
-                                            "${distro.approxSizeBytes / (1024 * 1024)} MB • ${distro.packageManager}"
-                                        },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    text = if (installed) "Launch" else "Install",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (installed) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.secondary
-                                )
-                            }
+    TuiDialog(
+        title = "LAUNCH DISTRO SESSION",
+        onDismiss = onDismiss
+    ) {
+        TuiTextInput(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = "filter distro or pkg mgr..."
+        )
+        LazyColumn(
+            modifier = Modifier.height(300.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            items(sorted, key = { it.id }) { distro ->
+                val installed = isDistroInstalled(distro.id)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(p.bg)
+                        .border(1.dp, if (installed) p.accent else p.border)
+                        .clickable {
+                            if (installed) onLaunchDistro(distro) else onInstallDistro(distro)
                         }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        TuiText(text = distro.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        TuiText(
+                            text = if (installed) "installed :: ${distro.packageManager}"
+                            else "${distro.approxSizeBytes / (1024 * 1024)} MB :: ${distro.packageManager}",
+                            color = p.textMuted,
+                            fontSize = 10.sp
+                        )
                     }
+                    TuiText(
+                        text = if (installed) "[RUN]" else "[GET]",
+                        color = if (installed) p.accent else p.info,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
         }
-    )
+    }
 }
