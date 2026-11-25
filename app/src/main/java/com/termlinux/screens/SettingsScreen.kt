@@ -74,12 +74,16 @@ fun SettingsScreen(
     onFontSizeChange: (Int) -> Unit,
     onThemeChange: (String) -> Unit,
     onAppThemeChange: (String) -> Unit,
+    onFontFamilyChange: (String) -> Unit,
     onScrollbackChange: (Int) -> Unit,
     onExtraKeysToggle: (Boolean) -> Unit,
     onExtraKeysPresetChange: (String) -> Unit,
     onImmersiveToggle: (Boolean) -> Unit,
     onWakeLockToggle: (Boolean) -> Unit,
     onAudioBridgeToggle: (Boolean) -> Unit,
+    onBootstrapCreateUserToggle: (Boolean) -> Unit,
+    onBootstrapUsernameChange: (String) -> Unit,
+    onBootstrapZshToggle: (Boolean) -> Unit,
     onOpenDesktop: () -> Unit,
     onRequestAllFilesAccess: () -> Unit,
     onPickSafFolder: () -> Unit,
@@ -244,6 +248,26 @@ fun SettingsScreen(
 
             // Terminal appearance & input
             SectionCard("Terminal & Input") {
+                Text("Terminal Font", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val isNerd = settings.fontFamilyId == "nerd"
+                    if (isNerd) {
+                        Button(onClick = { onFontFamilyChange("nerd") }, shape = RoundedCornerShape(8.dp)) {
+                            Text("JetBrainsMono Nerd")
+                        }
+                        OutlinedButton(onClick = { onFontFamilyChange("monospace") }, shape = RoundedCornerShape(8.dp)) {
+                            Text("System Mono")
+                        }
+                    } else {
+                        OutlinedButton(onClick = { onFontFamilyChange("nerd") }, shape = RoundedCornerShape(8.dp)) {
+                            Text("JetBrainsMono Nerd")
+                        }
+                        Button(onClick = { onFontFamilyChange("monospace") }, shape = RoundedCornerShape(8.dp)) {
+                            Text("System Mono")
+                        }
+                    }
+                }
+
                 Text("Font Size: ${settings.fontSizeSp} sp (or pinch-to-zoom)", style = MaterialTheme.typography.bodySmall)
                 Slider(
                     value = settings.fontSizeSp.toFloat(),
@@ -287,6 +311,40 @@ fun SettingsScreen(
                 ) {
                     Text("Immersive Fullscreen", style = MaterialTheme.typography.bodyMedium)
                     Switch(checked = settings.immersiveMode, onCheckedChange = onImmersiveToggle)
+                }
+            }
+
+            // Optional tl-bootstrap presets
+            SectionCard("Bootstrap Presets (Optional)") {
+                Text(
+                    "Applied when you run 'tl-bootstrap' inside Linux (restart session after changing).",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Create non-root sudo user", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = settings.bootstrapCreateUser, onCheckedChange = onBootstrapCreateUserToggle)
+                }
+                if (settings.bootstrapCreateUser) {
+                    OutlinedTextField(
+                        value = settings.bootstrapUsername,
+                        onValueChange = onBootstrapUsernameChange,
+                        label = { Text("Username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Zsh + Git Prompt preset", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = settings.bootstrapZshPreset, onCheckedChange = onBootstrapZshToggle)
                 }
             }
 

@@ -43,6 +43,8 @@ class LinuxSessionService : LifecycleService() {
         super.onStartCommand(intent, flags, startId)
         when (intent?.action) {
             ACTION_STOP -> {
+                val app = application as TermLinuxApp
+                app.container.androidBridgeServer.stop()
                 audioBridge.stop()
                 releaseWakeLock()
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -51,9 +53,10 @@ class LinuxSessionService : LifecycleService() {
             }
 
             ACTION_TERMINATE_SESSION -> {
+                val app = application as TermLinuxApp
+                app.container.androidBridgeServer.stop()
                 audioBridge.stop()
                 releaseWakeLock()
-                val app = application as TermLinuxApp
                 app.container.sessionManager.stopAllSessions()
             }
 
@@ -64,6 +67,7 @@ class LinuxSessionService : LifecycleService() {
 
             else -> {
                 val app = application as TermLinuxApp
+                app.container.androidBridgeServer.start()
                 val notification = buildNotification(app.container.sessionManager.sessionState.value)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     startForeground(

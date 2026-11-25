@@ -29,7 +29,11 @@ data class AppSettings(
     val immersiveMode: Boolean = true,
     val bellEnabled: Boolean = false,
     val wakeLockEnabled: Boolean = false,
-    val audioBridgeEnabled: Boolean = false
+    val audioBridgeEnabled: Boolean = false,
+    val fontFamilyId: String = "nerd",
+    val bootstrapCreateUser: Boolean = false,
+    val bootstrapUsername: String = "linux",
+    val bootstrapZshPreset: Boolean = false
 )
 
 class SettingsRepository(private val context: Context) {
@@ -48,6 +52,10 @@ class SettingsRepository(private val context: Context) {
         val BELL_ENABLED = booleanPreferencesKey("bell_enabled")
         val WAKE_LOCK_ENABLED = booleanPreferencesKey("wake_lock_enabled")
         val AUDIO_BRIDGE_ENABLED = booleanPreferencesKey("audio_bridge_enabled")
+        val FONT_FAMILY_ID = stringPreferencesKey("font_family_id")
+        val BOOTSTRAP_CREATE_USER = booleanPreferencesKey("bootstrap_create_user")
+        val BOOTSTRAP_USERNAME = stringPreferencesKey("bootstrap_username")
+        val BOOTSTRAP_ZSH_PRESET = booleanPreferencesKey("bootstrap_zsh_preset")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
@@ -63,7 +71,11 @@ class SettingsRepository(private val context: Context) {
             immersiveMode = prefs[Keys.IMMERSIVE_MODE] ?: true,
             bellEnabled = prefs[Keys.BELL_ENABLED] ?: false,
             wakeLockEnabled = prefs[Keys.WAKE_LOCK_ENABLED] ?: false,
-            audioBridgeEnabled = prefs[Keys.AUDIO_BRIDGE_ENABLED] ?: false
+            audioBridgeEnabled = prefs[Keys.AUDIO_BRIDGE_ENABLED] ?: false,
+            fontFamilyId = prefs[Keys.FONT_FAMILY_ID] ?: "nerd",
+            bootstrapCreateUser = prefs[Keys.BOOTSTRAP_CREATE_USER] ?: false,
+            bootstrapUsername = prefs[Keys.BOOTSTRAP_USERNAME] ?: "linux",
+            bootstrapZshPreset = prefs[Keys.BOOTSTRAP_ZSH_PRESET] ?: false
         )
     }
 
@@ -116,6 +128,23 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setAudioBridgeEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.AUDIO_BRIDGE_ENABLED] = enabled }
+    }
+
+    suspend fun setFontFamilyId(id: String) {
+        context.dataStore.edit { it[Keys.FONT_FAMILY_ID] = id }
+    }
+
+    suspend fun setBootstrapCreateUser(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.BOOTSTRAP_CREATE_USER] = enabled }
+    }
+
+    suspend fun setBootstrapUsername(name: String) {
+        val clean = name.lowercase().filter { it in 'a'..'z' || it in '0'..'9' || it == '_' || it == '-' }.ifBlank { "linux" }
+        context.dataStore.edit { it[Keys.BOOTSTRAP_USERNAME] = clean }
+    }
+
+    suspend fun setBootstrapZshPreset(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.BOOTSTRAP_ZSH_PRESET] = enabled }
     }
 
     fun exportToJson(settings: AppSettings): String = json.encodeToString(settings)

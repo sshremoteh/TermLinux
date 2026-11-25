@@ -1,5 +1,7 @@
 package com.termlinux.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.view.KeyEvent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -90,6 +92,8 @@ fun TerminalScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var showDistroPicker by remember { mutableStateOf(false) }
+    var showSearchDialog by remember { mutableStateOf(false) }
+    var showUrlsDialog by remember { mutableStateOf(false) }
     var ctrlActive by remember { mutableStateOf(false) }
     var altActive by remember { mutableStateOf(false) }
     var hostViewRef by remember { mutableStateOf<TerminalHostView?>(null) }
@@ -106,11 +110,11 @@ fun TerminalScreen(
         val host = hostViewRef ?: return@LaunchedEffect
         sessionManager.attachUiClient(host.sessionClient)
         host.attachSession(activeSession)
-        host.applyAppearance(settings.fontSizeSp, theme)
+        host.applyAppearance(settings.fontSizeSp, theme, settings.fontFamilyId)
     }
 
-    LaunchedEffect(hostViewRef, settings.fontSizeSp, theme) {
-        hostViewRef?.applyAppearance(settings.fontSizeSp, theme)
+    LaunchedEffect(hostViewRef, settings.fontSizeSp, theme, settings.fontFamilyId) {
+        hostViewRef?.applyAppearance(settings.fontSizeSp, theme, settings.fontFamilyId)
     }
 
     LaunchedEffect(hostViewRef, ctrlActive, altActive) {
@@ -145,6 +149,14 @@ fun TerminalScreen(
                 onPaste = {
                     scope.launch { drawerState.close() }
                     hostViewRef?.pasteFromClipboard()
+                },
+                onOpenSearch = {
+                    scope.launch { drawerState.close() }
+                    showSearchDialog = true
+                },
+                onOpenUrls = {
+                    scope.launch { drawerState.close() }
+                    showUrlsDialog = true
                 },
                 onToggleWakeLock = { onToggleWakeLock(!settings.wakeLockEnabled) },
                 onRestartSession = {
@@ -222,14 +234,14 @@ fun TerminalScreen(
                                 }
                             ).also { host ->
                                 hostViewRef = host
-                                host.applyAppearance(settings.fontSizeSp, theme)
+                                host.applyAppearance(settings.fontSizeSp, theme, settings.fontFamilyId)
                                 sessionManager.attachUiClient(host.sessionClient)
                                 host.attachSession(activeSession)
                             }
                         },
                         update = { host ->
                             hostViewRef = host
-                            host.applyAppearance(settings.fontSizeSp, theme)
+                            host.applyAppearance(settings.fontSizeSp, theme, settings.fontFamilyId)
                             host.attachSession(activeSession)
                         }
                     )
@@ -274,6 +286,81 @@ fun TerminalScreen(
             }
         )
     }
+
+    if (showSearchDialog) {
+        var query by remember { mutableStateOf("") }
+        val matches = remember(query) { hostViewRef?.searchTranscript(query).orEmpty() }
+        AlertDialog(
+            onDismissRequest = { showSearchDialog = false },
+            title = { Text("Search Terminal History", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text("Type text to search...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    LazyColumn(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(matches) { line ->
+                            Text(
+                                text = line,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSearchDialog = false }) { Text("Close") }
+            }
+        )
+    }
+
+    if (showUrlsDialog) {
+        val urls = remember { hostViewRef?.extractUrls().orEmpty() }
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        AlertDialog(
+            onDismissRequest = { showUrlsDialog = false },
+            title = { Text("Detected URLs", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                if (urls.isEmpty()) {
+                    Text("No URLs found in terminal buffer.", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    LazyColumn(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(urls) { url ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        runCatching {
+                                            ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                        }
+                                        showUrlsDialog = false
+                                    }
+                            ) {
+                                Text(
+                                    text = url,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showUrlsDialog = false }) { Text("Close") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -287,6 +374,8 @@ private fun TermuxDrawerSheet(
     onOpenDistroPicker: () -> Unit,
     onToggleKeyboard: () -> Unit,
     onPaste: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenUrls: () -> Unit,
     onToggleWakeLock: () -> Unit,
     onRestartSession: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -439,6 +528,14 @@ private fun TermuxDrawerSheet(
             ) {
                 DrawerActionButton("Keyboard", onClick = onToggleKeyboard, modifier = Modifier.weight(1f))
                 DrawerActionButton("Paste", onClick = onPaste, modifier = Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DrawerActionButton("Find", onClick = onOpenSearch, modifier = Modifier.weight(1f))
+                DrawerActionButton("URLs", onClick = onOpenUrls, modifier = Modifier.weight(1f))
             }
             Spacer(Modifier.height(8.dp))
             Row(

@@ -227,12 +227,16 @@ class MainActivity : ComponentActivity() {
                             onFontSizeChange = { size -> scope.launch { viewModel.settingsRepository.setFontSizeSp(size) } },
                             onThemeChange = { theme -> scope.launch { viewModel.settingsRepository.setThemeId(theme) } },
                             onAppThemeChange = { appTheme -> scope.launch { viewModel.settingsRepository.setAppThemeId(appTheme) } },
+                            onFontFamilyChange = { font -> scope.launch { viewModel.settingsRepository.setFontFamilyId(font) } },
                             onScrollbackChange = { lines -> scope.launch { viewModel.settingsRepository.setScrollbackLines(lines) } },
                             onExtraKeysToggle = { show -> scope.launch { viewModel.settingsRepository.setShowExtraKeys(show) } },
                             onExtraKeysPresetChange = { preset -> scope.launch { viewModel.settingsRepository.setExtraKeysPreset(preset) } },
                             onImmersiveToggle = { imm -> scope.launch { viewModel.settingsRepository.setImmersiveMode(imm) } },
                             onWakeLockToggle = { wl -> viewModel.setWakeLockEnabled(wl) },
                             onAudioBridgeToggle = { ab -> viewModel.setAudioBridgeEnabled(ab) },
+                            onBootstrapCreateUserToggle = { v -> scope.launch { viewModel.settingsRepository.setBootstrapCreateUser(v) } },
+                            onBootstrapUsernameChange = { u -> scope.launch { viewModel.settingsRepository.setBootstrapUsername(u) } },
+                            onBootstrapZshToggle = { z -> scope.launch { viewModel.settingsRepository.setBootstrapZshPreset(z) } },
                             onOpenDesktop = { route = AppRoute.DESKTOP },
                             onRequestAllFilesAccess = {
                                 viewModel.storageBridge.buildManageAllFilesIntent()?.let {

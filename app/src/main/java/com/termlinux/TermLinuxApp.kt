@@ -1,6 +1,7 @@
 package com.termlinux
 
 import android.app.Application
+import com.termlinux.bridge.AndroidBridgeServer
 import com.termlinux.core.AppPaths
 import com.termlinux.distro.DistroManager
 import com.termlinux.session.SessionManager
@@ -12,7 +13,8 @@ class AppContainer(application: Application) {
     val settingsRepository = SettingsRepository(application)
     val distroManager = DistroManager(application, paths)
     val storageBridge = StorageBridge(application, paths)
-    val sessionManager = SessionManager(application, paths, distroManager, storageBridge)
+    val androidBridgeServer = AndroidBridgeServer(application)
+    val sessionManager = SessionManager(application, paths, distroManager, storageBridge, androidBridgeServer)
 }
 
 class TermLinuxApp : Application() {

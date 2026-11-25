@@ -211,7 +211,7 @@ class DistroManager(
             """.trimIndent() + "\n"
         )
 
-        // Install tlfiles, tl-service, systemctl, tl-bootstrap, tl-desktop, tl-doctor
+        // Install tlfiles, tl-service, systemctl, tl-bootstrap, tl-desktop, tl-doctor, tl-clip, tl-open, tl-notify
         val usrLocalBin = File(rootfs, "usr/local/bin").apply { mkdirs() }
         writeExecutable(File(usrLocalBin, "tlfiles"), TLFILES_SCRIPT)
         writeExecutable(File(usrLocalBin, "tl-service"), TL_SERVICE_SCRIPT)
@@ -219,6 +219,9 @@ class DistroManager(
         writeExecutable(File(usrLocalBin, "tl-bootstrap"), TL_BOOTSTRAP_SCRIPT)
         writeExecutable(File(usrLocalBin, "tl-desktop"), TL_DESKTOP_SCRIPT)
         writeExecutable(File(usrLocalBin, "tl-doctor"), TL_DOCTOR_SCRIPT)
+        writeExecutable(File(usrLocalBin, "tl-clip"), TL_CLIP_SCRIPT)
+        writeExecutable(File(usrLocalBin, "tl-open"), TL_OPEN_SCRIPT)
+        writeExecutable(File(usrLocalBin, "tl-notify"), TL_NOTIFY_SCRIPT)
 
         // PulseAudio client/daemon config for TermLinux Audio Bridge (127.0.0.1:14713)
         val pulseDir = File(etcDir, "pulse").apply { mkdirs() }
@@ -449,6 +452,45 @@ class DistroManager(
               echo "Unsupported package manager." >&2
               exit 1
             fi
+
+            if [ "${'$'}{TL_BOOTSTRAP_ZSH:-0}" = "1" ]; then
+              echo "[tl-bootstrap] Installing Zsh + Tmux preset..."
+              if command -v apt-get >/dev/null 2>&1; then
+                DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends zsh
+              elif command -v apk >/dev/null 2>&1; then
+                apk add --no-cache zsh
+              elif command -v pacman >/dev/null 2>&1; then
+                pacman -S --noconfirm zsh
+              elif command -v dnf >/dev/null 2>&1; then
+                dnf install -y zsh
+              fi
+              cat > /root/.zshrc << 'ZRC'
+            export TERM="${'$'}{TERM:-xterm-256color}"
+            autoload -Uz vcs_info
+            precmd() { vcs_info }
+            zstyle ':vcs_info:git:*' formats ' (%b)'
+            setopt PROMPT_SUBST
+            PROMPT='%F{green}%n@termlinux%f:%F{cyan}%~%f%F{yellow}${'$'}vcs_info_msg_0_%f %# '
+            HISTFILE=~/.zsh_history
+            HISTSIZE=5000
+            SAVEHIST=5000
+            ZRC
+            fi
+
+            if [ "${'$'}{TL_BOOTSTRAP_CREATE_USER:-0}" = "1" ]; then
+              uname="${'$'}{TL_BOOTSTRAP_USER:-linux}"
+              echo "[tl-bootstrap] Creating sudo user '${'$'}uname'..."
+              if ! id "${'$'}uname" >/dev/null 2>&1; then
+                if command -v useradd >/dev/null 2>&1; then
+                  useradd -m -s /bin/bash "${'$'}uname"
+                elif command -v adduser >/dev/null 2>&1; then
+                  adduser -D "${'$'}uname"
+                fi
+              fi
+              mkdir -p /etc/sudoers.d
+              echo "${'$'}uname ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${'$'}uname"
+              chmod 0440 "/etc/sudoers.d/${'$'}uname"
+            fi
             echo "[tl-bootstrap] Done."
         """.trimIndent() + "\n"
 
@@ -526,6 +568,62 @@ class DistroManager(
             echo ""
             /usr/local/bin/tlfiles status
             /usr/local/bin/tl-service list
+        """.trimIndent() + "\n"
+
+        private val TL_CLIP_SCRIPT = """
+            #!/bin/sh
+            set -e
+            PORT="${'$'}{TL_BRIDGE_PORT:-14714}"
+            TOKEN="${'$'}{TL_BRIDGE_TOKEN:-}"
+            [ -n "${'$'}TOKEN" ] || { echo "TL_BRIDGE_TOKEN missing; restart TermLinux session." >&2; exit 1; }
+            b64_dec() { base64 -d 2>/dev/null || base64 --decode; }
+            b64_enc() { base64 | tr -d '\n'; }
+            send_cmd() {
+              printf "AUTH %s\n%s\n" "${'$'}TOKEN" "${'$'}1" | nc -w 3 127.0.0.1 "${'$'}PORT"
+            }
+            case "${'$'}{1:-get}" in
+              get)
+                resp="${'$'}(send_cmd "CLIP_GET")"
+                case "${'$'}resp" in
+                  OK\ *) printf "%s" "${'$'}{resp#OK }" | b64_dec ;;
+                  *) echo "${'$'}resp" >&2; exit 1 ;;
+                esac
+                ;;
+              set)
+                payload="${'$'}(cat | b64_enc)"
+                resp="${'$'}(send_cmd "CLIP_SET ${'$'}payload")"
+                [ "${'$'}resp" = "OK" ] || { echo "${'$'}resp" >&2; exit 1; }
+                ;;
+              *)
+                echo "Usage: tl-clip get | echo text | tl-clip set" >&2
+                exit 1
+                ;;
+            esac
+        """.trimIndent() + "\n"
+
+        private val TL_OPEN_SCRIPT = """
+            #!/bin/sh
+            set -e
+            [ -n "${'$'}{1:-}" ] || { echo "Usage: tl-open <url>" >&2; exit 1; }
+            PORT="${'$'}{TL_BRIDGE_PORT:-14714}"
+            TOKEN="${'$'}{TL_BRIDGE_TOKEN:-}"
+            payload="${'$'}(printf "%s" "${'$'}1" | base64 | tr -d '\n')"
+            resp="${'$'}(printf "AUTH %s\nOPEN %s\n" "${'$'}TOKEN" "${'$'}payload" | nc -w 3 127.0.0.1 "${'$'}PORT")"
+            [ "${'$'}resp" = "OK" ] || { echo "${'$'}resp" >&2; exit 1; }
+        """.trimIndent() + "\n"
+
+        private val TL_NOTIFY_SCRIPT = """
+            #!/bin/sh
+            set -e
+            title="${'$'}{1:-TermLinux}"
+            body="${'$'}{2:-${'$'}title}"
+            [ "${'$'}#" -eq 1 ] && title="TermLinux"
+            PORT="${'$'}{TL_BRIDGE_PORT:-14714}"
+            TOKEN="${'$'}{TL_BRIDGE_TOKEN:-}"
+            t64="${'$'}(printf "%s" "${'$'}title" | base64 | tr -d '\n')"
+            b64="${'$'}(printf "%s" "${'$'}body" | base64 | tr -d '\n')"
+            resp="${'$'}(printf "AUTH %s\nNOTIFY %s %s\n" "${'$'}TOKEN" "${'$'}t64" "${'$'}b64" | nc -w 3 127.0.0.1 "${'$'}PORT")"
+            [ "${'$'}resp" = "OK" ] || { echo "${'$'}resp" >&2; exit 1; }
         """.trimIndent() + "\n"
     }
 }

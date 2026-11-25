@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
+import com.termlinux.bridge.AndroidBridgeServer
 import com.termlinux.core.AppPaths
 import com.termlinux.distro.DistroEntry
 import com.termlinux.distro.DistroManager
@@ -53,7 +54,8 @@ class SessionManager(
     private val context: Context,
     private val paths: AppPaths,
     private val distroManager: DistroManager,
-    private val storageBridge: StorageBridge
+    private val storageBridge: StorageBridge,
+    private val androidBridgeServer: AndroidBridgeServer
 ) {
     private val _sessionState = MutableStateFlow<SessionState>(SessionState.Idle)
     val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
@@ -187,13 +189,22 @@ class SessionManager(
             val shellPath = distroManager.resolveShell(distro)
             val storageBinds = storageBridge.preparePRootBindings(settings.safTreeUri)
 
+            val extraEnv = mutableMapOf(
+                "TL_BRIDGE_PORT" to AndroidBridgeServer.DEFAULT_PORT.toString(),
+                "TL_BRIDGE_TOKEN" to androidBridgeServer.authToken,
+                "TL_BOOTSTRAP_CREATE_USER" to if (settings.bootstrapCreateUser) "1" else "0",
+                "TL_BOOTSTRAP_USER" to settings.bootstrapUsername,
+                "TL_BOOTSTRAP_ZSH" to if (settings.bootstrapZshPreset) "1" else "0"
+            )
+
             val launchSpec = PRootCommandBuilder.build(
                 prootBinary = paths.prootBinary(),
                 loaderBinary = paths.prootLoaderBinary(),
                 rootfsDir = rootfsDir,
                 tmpDir = paths.tmpDir(),
                 shellPath = shellPath,
-                bindMounts = storageBinds
+                bindMounts = storageBinds,
+                extraEnv = extraEnv
             )
 
             val session = TerminalSession(

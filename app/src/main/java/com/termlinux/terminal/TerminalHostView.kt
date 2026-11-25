@@ -30,7 +30,12 @@ class TerminalHostView(
     private var ctrlHeld = false
     private var altHeld = false
     private var currentFontSizeSp = 13f
+    private var currentFontFamilyId = ""
     private var scaleAccumulator = 1f
+
+    private val nerdTypeface: Typeface? by lazy {
+        runCatching { Typeface.createFromAsset(context.assets, "fonts/JetBrainsMonoNerd.ttf") }.getOrNull()
+    }
 
     private val tripleTapDetector = ThreeFingerTripleTapDetector(
         onTripleTap = onThreeFingerTripleTap
@@ -187,9 +192,14 @@ class TerminalHostView(
         terminalView.requestFocus()
     }
 
-    fun applyAppearance(fontSizeSp: Int, theme: TerminalColorTheme) {
+    fun applyAppearance(fontSizeSp: Int, theme: TerminalColorTheme, fontFamilyId: String = "nerd") {
         currentFontSizeSp = fontSizeSp.toFloat()
         applyFontSizePx(currentFontSizeSp)
+        if (currentFontFamilyId != fontFamilyId) {
+            currentFontFamilyId = fontFamilyId
+            val tf = if (fontFamilyId == "nerd") nerdTypeface ?: Typeface.MONOSPACE else Typeface.MONOSPACE
+            terminalView.setTypeface(tf)
+        }
 
         TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_FOREGROUND] = theme.foreground
         TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_BACKGROUND] = theme.background
@@ -254,5 +264,26 @@ class TerminalHostView(
 
     fun pasteFromClipboard() {
         sessionClient.onPasteTextFromClipboard(terminalView.currentSession)
+    }
+
+    fun searchTranscript(query: String): List<String> {
+        if (query.isBlank()) return emptyList()
+        val text = terminalView.currentSession?.emulator?.screen?.transcriptText ?: return emptyList()
+        return text.lineSequence()
+            .filter { it.contains(query, ignoreCase = true) }
+            .toList()
+            .takeLast(50)
+            .reversed()
+    }
+
+    fun extractUrls(): List<String> {
+        val text = terminalView.currentSession?.emulator?.screen?.transcriptText ?: return emptyList()
+        val regex = Regex("""https?://[^\s<>"{}|\\^`\[\]]+""")
+        return regex.findAll(text)
+            .map { it.value.trimEnd('.', ',', ';', ')', ']') }
+            .distinct()
+            .toList()
+            .takeLast(30)
+            .reversed()
     }
 }
