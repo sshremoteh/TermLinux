@@ -211,20 +211,37 @@ class DistroManager(
             """.trimIndent() + "\n"
         )
 
-        // Install tlfiles helper for SAF Storage Bridge & diagnostics
+        // Install tlfiles, tl-service, systemctl, tl-bootstrap, tl-desktop, tl-doctor
         val usrLocalBin = File(rootfs, "usr/local/bin").apply { mkdirs() }
-        val tlfiles = File(usrLocalBin, "tlfiles")
-        tlfiles.writeText(TLFILES_SCRIPT)
-        tlfiles.setExecutable(true, false)
+        writeExecutable(File(usrLocalBin, "tlfiles"), TLFILES_SCRIPT)
+        writeExecutable(File(usrLocalBin, "tl-service"), TL_SERVICE_SCRIPT)
+        writeExecutable(File(usrLocalBin, "systemctl"), SYSTEMCTL_WRAPPER_SCRIPT)
+        writeExecutable(File(usrLocalBin, "tl-bootstrap"), TL_BOOTSTRAP_SCRIPT)
+        writeExecutable(File(usrLocalBin, "tl-desktop"), TL_DESKTOP_SCRIPT)
+        writeExecutable(File(usrLocalBin, "tl-doctor"), TL_DOCTOR_SCRIPT)
+
+        // PulseAudio client/daemon config for TermLinux Audio Bridge (127.0.0.1:14713)
+        val pulseDir = File(etcDir, "pulse").apply { mkdirs() }
+        val pulseDefault = File(pulseDir, "default.pa")
+        if (!pulseDefault.exists()) {
+            pulseDefault.writeText(
+                "load-module module-simple-protocol-tcp rate=44100 format=s16le channels=2 source=auto_null.monitor record=false port=14713\n" +
+                    "load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1 port=4713\n"
+            )
+        }
 
         // Note Android/PRoot package manager environment hint
         val motd = File(etcDir, "motd")
         motd.writeText(
             "TermLinux (${distro.name}) running via PRoot.\n" +
-                "Package manager: ${distro.packageManager}. " +
-                "Note: kernel-level features (systemd, Docker, raw sockets) are unavailable under Android/PRoot.\n" +
-                "Run 'tlfiles help' for /sdcard and Storage Bridge status.\n"
+                "Package manager: ${distro.packageManager}.\n" +
+                "Helpers: tl-bootstrap (dev tools), tl-service / systemctl (daemons), tl-desktop (GUI), tl-doctor (check), tlfiles (/sdcard).\n"
         )
+    }
+
+    private fun writeExecutable(file: File, content: String) {
+        file.writeText(content)
+        file.setExecutable(true, false)
     }
 
     private fun preserveUserDirs(fromRootfs: File, toStaging: File) {
@@ -276,6 +293,239 @@ class DistroManager(
                 echo "POSIX bind-mounting a content:// URI is not supported by Android/PRoot."
                 ;;
             esac
+        """.trimIndent() + "\n"
+
+        private val TL_SERVICE_SCRIPT = """
+            #!/bin/sh
+            set -e
+            RUN_DIR="/var/run/tl-services"
+            LOG_DIR="/var/log/tl-services"
+            mkdir -p "${'$'}RUN_DIR" "${'$'}LOG_DIR"
+
+            cmd="${'$'}{1:-list}"
+            svc="${'$'}{2:-}"
+
+            start_service() {
+              name="${'$'}1"
+              pidfile="${'$'}RUN_DIR/${'$'}name.pid"
+              logfile="${'$'}LOG_DIR/${'$'}name.log"
+              if [ -f "${'$'}pidfile" ] && kill -0 "${'$'}(cat "${'$'}pidfile")" 2>/dev/null; then
+                echo "[tl-service] ${'$'}name already running (PID ${'$'}(cat "${'$'}pidfile"))"
+                return 0
+              fi
+              case "${'$'}name" in
+                ssh|sshd)
+                  mkdir -p /run/sshd
+                  [ -f /etc/ssh/ssh_host_rsa_key ] || ssh-keygen -A 2>/dev/null || true
+                  nohup /usr/sbin/sshd -D -p 2222 >"${'$'}logfile" 2>&1 &
+                  ;;
+                cron|crond)
+                  if command -v cron >/dev/null 2>&1; then
+                    nohup cron -f >"${'$'}logfile" 2>&1 &
+                  else
+                    nohup crond -f >"${'$'}logfile" 2>&1 &
+                  fi
+                  ;;
+                nginx)
+                  nohup nginx -g "daemon off;" >"${'$'}logfile" 2>&1 &
+                  ;;
+                redis|redis-server)
+                  nohup redis-server --daemonize no >"${'$'}logfile" 2>&1 &
+                  ;;
+                *)
+                  if [ -x "/etc/init.d/${'$'}name" ]; then
+                    "/etc/init.d/${'$'}name" start >"${'$'}logfile" 2>&1
+                    return 0
+                  fi
+                  echo "[tl-service] Unknown service '${'$'}name'. Supported: sshd (port 2222), cron, nginx, redis-server, or /etc/init.d/<name>." >&2
+                  exit 1
+                  ;;
+              esac
+              echo ${'$'}! > "${'$'}pidfile"
+              echo "[tl-service] Started ${'$'}name (PID ${'$'}!)"
+            }
+
+            stop_service() {
+              name="${'$'}1"
+              pidfile="${'$'}RUN_DIR/${'$'}name.pid"
+              if [ -f "${'$'}pidfile" ]; then
+                pid="${'$'}(cat "${'$'}pidfile")"
+                kill "${'$'}pid" 2>/dev/null || true
+                rm -f "${'$'}pidfile"
+                echo "[tl-service] Stopped ${'$'}name"
+              elif [ -x "/etc/init.d/${'$'}name" ]; then
+                "/etc/init.d/${'$'}name" stop || true
+              else
+                echo "[tl-service] ${'$'}name is not running"
+              fi
+            }
+
+            case "${'$'}cmd" in
+              start)
+                [ -n "${'$'}svc" ] || { echo "Usage: tl-service start <name>"; exit 1; }
+                start_service "${'$'}svc"
+                ;;
+              stop)
+                [ -n "${'$'}svc" ] || { echo "Usage: tl-service stop <name>"; exit 1; }
+                stop_service "${'$'}svc"
+                ;;
+              restart)
+                [ -n "${'$'}svc" ] || { echo "Usage: tl-service restart <name>"; exit 1; }
+                stop_service "${'$'}svc"
+                start_service "${'$'}svc"
+                ;;
+              status)
+                [ -n "${'$'}svc" ] || { echo "Usage: tl-service status <name>"; exit 1; }
+                pidfile="${'$'}RUN_DIR/${'$'}svc.pid"
+                if [ -f "${'$'}pidfile" ] && kill -0 "${'$'}(cat "${'$'}pidfile")" 2>/dev/null; then
+                  echo "${'$'}svc: running (PID ${'$'}(cat "${'$'}pidfile"))"
+                else
+                  echo "${'$'}svc: stopped"
+                  exit 3
+                fi
+                ;;
+              logs)
+                [ -n "${'$'}svc" ] || { echo "Usage: tl-service logs <name>"; exit 1; }
+                cat "${'$'}LOG_DIR/${'$'}svc.log" 2>/dev/null || echo "No logs for ${'$'}svc"
+                ;;
+              list|*)
+                echo "TermLinux user-space services (${'$'}RUN_DIR):"
+                for f in "${'$'}RUN_DIR"/*.pid; do
+                  [ -e "${'$'}f" ] || { echo "  (none running)"; break; }
+                  n="${'$'}(basename "${'$'}f" .pid)"
+                  p="${'$'}(cat "${'$'}f")"
+                  if kill -0 "${'$'}p" 2>/dev/null; then
+                    echo "  [UP]   ${'$'}n (PID ${'$'}p)"
+                  else
+                    echo "  [DEAD] ${'$'}n (stale PID ${'$'}p)"
+                  fi
+                done
+                ;;
+            esac
+        """.trimIndent() + "\n"
+
+        private val SYSTEMCTL_WRAPPER_SCRIPT = """
+            #!/bin/sh
+            # TermLinux PRoot systemctl compatibility wrapper (no systemd kernel PID 1 in PRoot)
+            action="${'$'}{1:-}"
+            unit="${'$'}{2:-}"
+            unit="${'$'}{unit%.service}"
+            case "${'$'}action" in
+              start|stop|restart|status)
+                exec /usr/local/bin/tl-service "${'$'}action" "${'$'}unit"
+                ;;
+              is-active)
+                /usr/local/bin/tl-service status "${'$'}unit" >/dev/null 2>&1 && echo "active" || { echo "inactive"; exit 3; }
+                ;;
+              enable|disable|daemon-reload)
+                echo "[systemctl-pr] '${'$'}action ${'$'}unit' acknowledged (PRoot user-space mode)."
+                ;;
+              *)
+                exec /usr/local/bin/tl-service list
+                ;;
+            esac
+        """.trimIndent() + "\n"
+
+        private val TL_BOOTSTRAP_SCRIPT = """
+            #!/bin/sh
+            set -e
+            echo "[tl-bootstrap] Installing core Linux developer tools..."
+            if command -v apt-get >/dev/null 2>&1; then
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                ca-certificates curl wget git vim nano htop tmux sudo openssh-client python3 locales
+            elif command -v apk >/dev/null 2>&1; then
+              apk update
+              apk add --no-cache ca-certificates curl wget git vim nano htop tmux sudo openssh-client python3 bash
+            elif command -v pacman >/dev/null 2>&1; then
+              pacman -Sy --noconfirm ca-certificates curl wget git vim nano htop tmux sudo openssh python
+            elif command -v dnf >/dev/null 2>&1; then
+              dnf install -y ca-certificates curl wget git vim nano htop tmux sudo openssh-clients python3
+            elif command -v zypper >/dev/null 2>&1; then
+              zypper --non-interactive install ca-certificates curl wget git vim nano htop tmux sudo openssh python3
+            elif command -v xbps-install >/dev/null 2>&1; then
+              xbps-install -Suy ca-certificates curl wget git vim nano htop tmux sudo openssh python3
+            else
+              echo "Unsupported package manager." >&2
+              exit 1
+            fi
+            echo "[tl-bootstrap] Done."
+        """.trimIndent() + "\n"
+
+        private val TL_DESKTOP_SCRIPT = """
+            #!/bin/sh
+            set -e
+            cmd="${'$'}{1:-help}"
+            case "${'$'}cmd" in
+              setup)
+                echo "[tl-desktop] Installing XFCE4 + VNC server for TermLinux GUI Desktop..."
+                if command -v apt-get >/dev/null 2>&1; then
+                  apt-get update
+                  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                    xfce4 xfce4-terminal tigervnc-standalone-server dbus-x11 xfonts-base
+                elif command -v apk >/dev/null 2>&1; then
+                  apk update
+                  apk add --no-cache xfce4 xfce4-terminal xvfb x11vnc dbus ttf-dejavu
+                elif command -v pacman >/dev/null 2>&1; then
+                  pacman -Sy --noconfirm xfce4 xfce4-terminal tigervnc dbus
+                else
+                  echo "Automatic setup supports apt/apk/pacman. Install xfce4 + tigervnc manually." >&2
+                  exit 1
+                fi
+                mkdir -p /root/.vnc
+                printf '#!/bin/sh\nunset SESSION_MANAGER\nunset DBUS_SESSION_BUS_ADDRESS\nexec startxfce4\n' > /root/.vnc/xstartup
+                chmod +x /root/.vnc/xstartup
+                echo "[tl-desktop] Setup complete. Run 'tl-desktop start' then open Desktop (GUI) in TermLinux."
+                ;;
+              start)
+                mkdir -p /tmp/.X11-unix /root/.vnc
+                export DISPLAY=:1
+                if command -v vncserver >/dev/null 2>&1; then
+                  vncserver :1 -geometry 1280x720 -depth 24 -SecurityTypes None -localhost yes
+                elif command -v Xvnc >/dev/null 2>&1; then
+                  nohup Xvnc :1 -geometry 1280x720 -depth 24 -SecurityTypes None -localhost yes >/tmp/xvnc.log 2>&1 &
+                  sleep 1
+                  nohup dbus-run-session startxfce4 >/tmp/xfce.log 2>&1 &
+                elif command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1; then
+                  nohup Xvfb :1 -screen 0 1280x720x24 >/tmp/xvfb.log 2>&1 &
+                  sleep 1
+                  nohup x11vnc -display :1 -nopw -listen 127.0.0.1 -rfbport 5901 -forever >/tmp/x11vnc.log 2>&1 &
+                  nohup dbus-run-session startxfce4 >/tmp/xfce.log 2>&1 &
+                else
+                  echo "No VNC server found. Run 'tl-desktop setup' first." >&2
+                  exit 1
+                fi
+                echo "[tl-desktop] GUI Desktop listening on 127.0.0.1:5901. Open Desktop (GUI) from TermLinux menu."
+                ;;
+              stop)
+                vncserver -kill :1 2>/dev/null || pkill -f "Xvnc :1|x11vnc|startxfce4" 2>/dev/null || true
+                echo "[tl-desktop] Desktop stopped."
+                ;;
+              help|*)
+                echo "tl-desktop - TermLinux GUI Desktop manager"
+                echo "  tl-desktop setup   Install XFCE4 + VNC server"
+                echo "  tl-desktop start   Start GUI desktop on 127.0.0.1:5901"
+                echo "  tl-desktop stop    Stop GUI desktop"
+                ;;
+            esac
+        """.trimIndent() + "\n"
+
+        private val TL_DOCTOR_SCRIPT = """
+            #!/bin/sh
+            echo "=== TermLinux PRoot Doctor ==="
+            echo "Kernel: ${'$'}(uname -a)"
+            echo "User:   ${'$'}(id)"
+            echo "Shell:  ${'$'}SHELL"
+            echo "Locale: LANG=${'$'}LANG LC_ALL=${'$'}LC_ALL"
+            echo -n "/dev/shm writable: "
+            if (touch /dev/shm/.tl_test && rm -f /dev/shm/.tl_test) 2>/dev/null; then echo "OK"; else echo "FAIL"; fi
+            echo -n "/proc/loadavg: "
+            cat /proc/loadavg 2>/dev/null || echo "UNAVAILABLE"
+            echo -n "DNS /etc/resolv.conf: "
+            tr '\n' ' ' < /etc/resolv.conf 2>/dev/null || echo "MISSING"
+            echo ""
+            /usr/local/bin/tlfiles status
+            /usr/local/bin/tl-service list
         """.trimIndent() + "\n"
     }
 }

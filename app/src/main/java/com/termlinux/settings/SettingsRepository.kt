@@ -28,7 +28,8 @@ data class AppSettings(
     val extraKeysPreset: String = "standard",
     val immersiveMode: Boolean = true,
     val bellEnabled: Boolean = false,
-    val wakeLockEnabled: Boolean = false
+    val wakeLockEnabled: Boolean = false,
+    val audioBridgeEnabled: Boolean = false
 )
 
 class SettingsRepository(private val context: Context) {
@@ -46,6 +47,7 @@ class SettingsRepository(private val context: Context) {
         val IMMERSIVE_MODE = booleanPreferencesKey("immersive_mode")
         val BELL_ENABLED = booleanPreferencesKey("bell_enabled")
         val WAKE_LOCK_ENABLED = booleanPreferencesKey("wake_lock_enabled")
+        val AUDIO_BRIDGE_ENABLED = booleanPreferencesKey("audio_bridge_enabled")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
@@ -60,7 +62,8 @@ class SettingsRepository(private val context: Context) {
             extraKeysPreset = prefs[Keys.EXTRA_KEYS_PRESET] ?: "standard",
             immersiveMode = prefs[Keys.IMMERSIVE_MODE] ?: true,
             bellEnabled = prefs[Keys.BELL_ENABLED] ?: false,
-            wakeLockEnabled = prefs[Keys.WAKE_LOCK_ENABLED] ?: false
+            wakeLockEnabled = prefs[Keys.WAKE_LOCK_ENABLED] ?: false,
+            audioBridgeEnabled = prefs[Keys.AUDIO_BRIDGE_ENABLED] ?: false
         )
     }
 
@@ -109,6 +112,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setWakeLockEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.WAKE_LOCK_ENABLED] = enabled }
+    }
+
+    suspend fun setAudioBridgeEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUDIO_BRIDGE_ENABLED] = enabled }
     }
 
     fun exportToJson(settings: AppSettings): String = json.encodeToString(settings)

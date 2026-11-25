@@ -79,6 +79,8 @@ fun SettingsScreen(
     onExtraKeysPresetChange: (String) -> Unit,
     onImmersiveToggle: (Boolean) -> Unit,
     onWakeLockToggle: (Boolean) -> Unit,
+    onAudioBridgeToggle: (Boolean) -> Unit,
+    onOpenDesktop: () -> Unit,
     onRequestAllFilesAccess: () -> Unit,
     onPickSafFolder: () -> Unit,
     onRunSafTest: () -> Unit,
@@ -167,6 +169,26 @@ fun SettingsScreen(
                         )
                     }
                     Switch(checked = settings.wakeLockEnabled, onCheckedChange = onWakeLockToggle)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Audio Bridge (127.0.0.1:14713)", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Stream Linux PulseAudio TCP PCM to Android speakers",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = settings.audioBridgeEnabled, onCheckedChange = onAudioBridgeToggle)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onOpenDesktop, shape = RoundedCornerShape(8.dp)) {
+                        Text("Open GUI Desktop (VNC)")
+                    }
                 }
             }
 

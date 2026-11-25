@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.termlinux.screens.DesktopScreen
 import com.termlinux.screens.OnboardingScreen
 import com.termlinux.screens.SettingsScreen
 import com.termlinux.screens.TerminalScreen
@@ -31,7 +32,8 @@ import kotlinx.coroutines.launch
 private enum class AppRoute {
     ONBOARDING,
     TERMINAL,
-    SETTINGS
+    SETTINGS,
+    DESKTOP
 }
 
 class MainActivity : ComponentActivity() {
@@ -179,6 +181,7 @@ class MainActivity : ComponentActivity() {
                             sessionManager = viewModel.sessionManager,
                             activeSession = viewModel.sessionManager.activeTerminalSession,
                             onOpenSettings = { route = AppRoute.SETTINGS },
+                            onOpenDesktop = { route = AppRoute.DESKTOP },
                             onNewSession = { viewModel.launchSelectedDistro(forceNewTab = true) },
                             onLaunchDistroSession = { distro ->
                                 viewModel.launchDistroSession(distro, forceNewTab = true)
@@ -229,6 +232,8 @@ class MainActivity : ComponentActivity() {
                             onExtraKeysPresetChange = { preset -> scope.launch { viewModel.settingsRepository.setExtraKeysPreset(preset) } },
                             onImmersiveToggle = { imm -> scope.launch { viewModel.settingsRepository.setImmersiveMode(imm) } },
                             onWakeLockToggle = { wl -> viewModel.setWakeLockEnabled(wl) },
+                            onAudioBridgeToggle = { ab -> viewModel.setAudioBridgeEnabled(ab) },
+                            onOpenDesktop = { route = AppRoute.DESKTOP },
                             onRequestAllFilesAccess = {
                                 viewModel.storageBridge.buildManageAllFilesIntent()?.let {
                                     allFilesLauncher.launch(it)
@@ -241,6 +246,12 @@ class MainActivity : ComponentActivity() {
                             onExportConfig = { exportConfigLauncher.launch("termlinux-config.json") },
                             onImportConfig = { importConfigLauncher.launch(arrayOf("application/json")) },
                             safTestResult = safTestResult
+                        )
+                    }
+
+                    AppRoute.DESKTOP -> {
+                        DesktopScreen(
+                            onBackToTerminal = { route = AppRoute.TERMINAL }
                         )
                     }
                 }

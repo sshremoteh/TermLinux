@@ -98,6 +98,8 @@ object PRootCommandBuilder {
         args.add("LANG=C.UTF-8")
         args.add("LC_ALL=C.UTF-8")
         args.add("TMPDIR=/tmp")
+        args.add("DISPLAY=:1")
+        args.add("PULSE_SERVER=127.0.0.1:4713")
         args.add("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
         for ((k, v) in extraEnv) {
             require(!k.contains('=') && !k.contains('\u0000') && !v.contains('\u0000')) {

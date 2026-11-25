@@ -77,6 +77,7 @@ fun TerminalScreen(
     sessionManager: SessionManager,
     activeSession: TerminalSession?,
     onOpenSettings: () -> Unit,
+    onOpenDesktop: () -> Unit,
     onNewSession: () -> Unit,
     onLaunchDistroSession: (DistroEntry) -> Unit,
     onInstallDistro: (DistroEntry) -> Unit,
@@ -153,6 +154,10 @@ fun TerminalScreen(
                 onOpenSettings = {
                     scope.launch { drawerState.close() }
                     onOpenSettings()
+                },
+                onOpenDesktop = {
+                    scope.launch { drawerState.close() }
+                    onOpenDesktop()
                 }
             )
         }
@@ -284,7 +289,8 @@ private fun TermuxDrawerSheet(
     onPaste: () -> Unit,
     onToggleWakeLock: () -> Unit,
     onRestartSession: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenDesktop: () -> Unit
 ) {
     ModalDrawerSheet(
         modifier = Modifier.width(300.dp),
@@ -445,8 +451,10 @@ private fun TermuxDrawerSheet(
                     filled = wakeLockEnabled,
                     modifier = Modifier.weight(1f)
                 )
-                DrawerActionButton("Restart", onClick = onRestartSession, modifier = Modifier.weight(1f))
+                DrawerActionButton("Desktop (GUI)", onClick = onOpenDesktop, modifier = Modifier.weight(1f))
             }
+            Spacer(Modifier.height(8.dp))
+            DrawerActionButton("Restart Session", onClick = onRestartSession, modifier = Modifier.fillMaxWidth())
         }
     }
 }

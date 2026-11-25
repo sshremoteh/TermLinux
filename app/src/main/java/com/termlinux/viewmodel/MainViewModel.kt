@@ -144,6 +144,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setAudioBridgeEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setAudioBridgeEnabled(enabled)
+            val app = getApplication<Application>()
+            val intent = Intent(app, LinuxSessionService::class.java).apply {
+                action = if (enabled) LinuxSessionService.ACTION_START_AUDIO
+                else LinuxSessionService.ACTION_STOP_AUDIO
+            }
+            runCatching { app.startService(intent) }
+        }
+    }
+
     fun restartSession() {
         viewModelScope.launch {
             sessionManager.stopSession()

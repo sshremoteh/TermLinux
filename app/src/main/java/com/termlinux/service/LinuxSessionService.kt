@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import com.termlinux.MainActivity
 import com.termlinux.R
 import com.termlinux.TermLinuxApp
+import com.termlinux.audio.AudioBridgeServer
 import com.termlinux.session.SessionState
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -22,6 +23,7 @@ class LinuxSessionService : LifecycleService() {
 
     private var isForegroundStarted = false
     private var wakeLock: PowerManager.WakeLock? = null
+    private val audioBridge = AudioBridgeServer()
 
     override fun onCreate() {
         super.onCreate()
@@ -41,6 +43,7 @@ class LinuxSessionService : LifecycleService() {
         super.onStartCommand(intent, flags, startId)
         when (intent?.action) {
             ACTION_STOP -> {
+                audioBridge.stop()
                 releaseWakeLock()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 isForegroundStarted = false
@@ -48,6 +51,7 @@ class LinuxSessionService : LifecycleService() {
             }
 
             ACTION_TERMINATE_SESSION -> {
+                audioBridge.stop()
                 releaseWakeLock()
                 val app = application as TermLinuxApp
                 app.container.sessionManager.stopAllSessions()
@@ -55,6 +59,8 @@ class LinuxSessionService : LifecycleService() {
 
             ACTION_ACQUIRE_WAKELOCK -> acquireWakeLock()
             ACTION_RELEASE_WAKELOCK -> releaseWakeLock()
+            ACTION_START_AUDIO -> audioBridge.start()
+            ACTION_STOP_AUDIO -> audioBridge.stop()
 
             else -> {
                 val app = application as TermLinuxApp
@@ -75,6 +81,7 @@ class LinuxSessionService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        audioBridge.stop()
         releaseWakeLock()
         super.onDestroy()
     }
@@ -167,5 +174,7 @@ class LinuxSessionService : LifecycleService() {
         const val ACTION_TERMINATE_SESSION = "com.termlinux.action.TERMINATE_SESSION"
         const val ACTION_ACQUIRE_WAKELOCK = "com.termlinux.action.ACQUIRE_WAKELOCK"
         const val ACTION_RELEASE_WAKELOCK = "com.termlinux.action.RELEASE_WAKELOCK"
+        const val ACTION_START_AUDIO = "com.termlinux.action.START_AUDIO"
+        const val ACTION_STOP_AUDIO = "com.termlinux.action.STOP_AUDIO"
     }
 }

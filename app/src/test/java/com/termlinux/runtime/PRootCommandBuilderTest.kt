@@ -34,6 +34,8 @@ class PRootCommandBuilderTest {
         assertTrue(spec.argv.contains("${hostShared.absolutePath}:/sdcard"))
         assertTrue(spec.argv.contains("/bin/bash"))
         assertTrue(spec.argv.contains("-l"))
+        assertTrue(spec.argv.contains("DISPLAY=:1"))
+        assertTrue(spec.argv.contains("PULSE_SERVER=127.0.0.1:4713"))
         assertTrue(spec.envp.any { it == "PROOT_LOADER=${loader.absolutePath}" })
         assertTrue(spec.envp.any { it == "PROOT_TMP_DIR=${tmpDir.absolutePath}" })
     }
