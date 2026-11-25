@@ -1,0 +1,11 @@
+.gradle/
+.idea/
+*.iml
+local.properties
+build/
+app/build/
+app/.cxx/
+native/proot/build-arm64/
+native/terminal/*/build/
+native/terminal/*/.cxx/
+.DS_Store

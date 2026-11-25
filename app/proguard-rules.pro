@@ -1,0 +1,4 @@
+-keep class com.termlinux.runtime.NativeBridge { *; }
+-keep class com.termlinux.distro.DistroManifest { *; }
+-keep class com.termlinux.distro.DistroEntry { *; }
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
