@@ -416,23 +416,24 @@ private fun TermuxDrawerSheet(
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = onOpenSettings,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(2.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(36.dp)
+                    modifier = Modifier.height(34.dp)
                 ) {
-                    Text("Settings", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                    Text("CONFIG", style = MaterialTheme.typography.labelMedium, fontFamily = FontFamily.Monospace, maxLines = 1)
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Spacer(Modifier.height(10.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Spacer(Modifier.height(8.dp))
 
             Text(
-                text = "SESSIONS",
+                text = "[ SESSIONS ]",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = FontFamily.Monospace
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(8.dp))
 
@@ -445,7 +446,7 @@ private fun TermuxDrawerSheet(
                     Surface(
                         color = if (isActive) MaterialTheme.colorScheme.surfaceVariant
                         else MaterialTheme.colorScheme.background,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(2.dp),
                         border = BorderStroke(
                             1.dp,
                             if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -563,24 +564,24 @@ private fun DrawerActionButton(
     modifier: Modifier = Modifier,
     filled: Boolean = false
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(2.dp)
     if (filled) {
         Button(
             onClick = onClick,
             shape = shape,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-            modifier = modifier.height(38.dp)
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            modifier = modifier.height(36.dp)
         ) {
-            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     } else {
         OutlinedButton(
             onClick = onClick,
             shape = shape,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-            modifier = modifier.height(38.dp)
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            modifier = modifier.height(36.dp)
         ) {
-            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -671,16 +672,16 @@ private fun ExtraKeyRow(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(5.dp))
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(2.dp))
                     .background(
-                        if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                        if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
                         else MaterialTheme.colorScheme.surface
                     )
                     .border(
                         1.dp,
                         if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        RoundedCornerShape(5.dp)
+                        RoundedCornerShape(2.dp)
                     )
                     .clickable {
                         when (label) {

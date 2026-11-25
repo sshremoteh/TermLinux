@@ -1,11 +1,14 @@
 package com.termlinux.ui.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 data class TerminalColorTheme(
     val id: String,
@@ -54,22 +57,22 @@ data class AppUiTheme(
 object AppUiThemes {
     val Obsidian = AppUiTheme(
         id = "obsidian",
-        label = "Obsidian",
+        label = "TTY Dark",
         isLight = false,
         colorScheme = darkColorScheme(
-            primary = Color(0xFF4ADE80),
-            onPrimary = Color(0xFF052E16),
+            primary = Color(0xFF00E676),
+            onPrimary = Color(0xFF001F0F),
             secondary = Color(0xFF38BDF8),
-            onSecondary = Color(0xFF082F49),
-            background = Color(0xFF0C0E12),
-            onBackground = Color(0xFFE6E9EF),
-            surface = Color(0xFF141820),
-            onSurface = Color(0xFFE6E9EF),
-            surfaceVariant = Color(0xFF1E2430),
-            onSurfaceVariant = Color(0xFF9CA3AF),
-            outline = Color(0xFF2A3140),
-            error = Color(0xFFF87171),
-            onError = Color(0xFF450A0A)
+            onSecondary = Color(0xFF001E2E),
+            background = Color(0xFF07090C),
+            onBackground = Color(0xFFE2E8F0),
+            surface = Color(0xFF0D1117),
+            onSurface = Color(0xFFE2E8F0),
+            surfaceVariant = Color(0xFF161B22),
+            onSurfaceVariant = Color(0xFF8B949E),
+            outline = Color(0xFF28303D),
+            error = Color(0xFFFF5555),
+            onError = Color(0xFF2B0000)
         )
     )
 
@@ -142,6 +145,14 @@ object AppUiThemes {
         all.firstOrNull { it.id == id } ?: Obsidian
 }
 
+private val LinuxSharpShapes = Shapes(
+    extraSmall = RoundedCornerShape(2.dp),
+    small = RoundedCornerShape(2.dp),
+    medium = RoundedCornerShape(3.dp),
+    large = RoundedCornerShape(3.dp),
+    extraLarge = RoundedCornerShape(4.dp)
+)
+
 @Composable
 fun TermLinuxTheme(
     appThemeId: String = "obsidian",
@@ -150,6 +161,7 @@ fun TermLinuxTheme(
     val theme = AppUiThemes.byId(appThemeId)
     MaterialTheme(
         colorScheme = theme.colorScheme,
+        shapes = LinuxSharpShapes,
         content = content
     )
 }

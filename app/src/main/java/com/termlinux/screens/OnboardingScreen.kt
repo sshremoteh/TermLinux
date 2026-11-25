@@ -115,6 +115,7 @@ fun OnboardingScreen(
                 Card(
                     onClick = { if (!isInstalling) onSelectDistro(distro.id) },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(2.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (selected) MaterialTheme.colorScheme.surfaceVariant
                         else MaterialTheme.colorScheme.surface
@@ -164,6 +165,7 @@ fun OnboardingScreen(
             )
             Card(
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(2.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
             ) {
